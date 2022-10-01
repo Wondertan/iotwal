@@ -58,6 +58,10 @@ type Vote struct {
 	Signature        []byte                `json:"signature"`
 }
 
+func NewVote(round int32, blockID *BlockID) *Vote {
+	return &Vote{Type: tmproto.PrevoteType, Round: round, BlockID: *blockID, Timestamp: time.Now()}
+}
+
 // CommitSig converts the Vote to a CommitSig.
 func (vote *Vote) CommitSig() CommitSig {
 	if vote == nil {
@@ -254,4 +258,3 @@ func IsVoteTypeValid(t pb.SignedMsgType) bool {
 		return false
 	}
 }
-

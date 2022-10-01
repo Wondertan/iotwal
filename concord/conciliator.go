@@ -15,17 +15,17 @@ type conciliator struct {
 
 type concord struct {
 	concordId string
-	topic *pubsub.Topic
+	topic     *pubsub.Topic
 
-	valSet *ValidatorSet
-	valSelf PrivValidator
+	valSet    *ValidatorSet
+	valSelf   PrivValidator
 	valSelfPK crypto.PubKey
 
 	stateMu sync.Mutex
-	state struct{
-		Height    int64
-		Round     int32
-		Step      RoundStepType
+	state   struct {
+		Height int64
+		Round  int32
+		Step   RoundStepType
 		// Last known round with POL for non-nil valid block.
 		ValidRound int32
 	}
@@ -68,21 +68,3 @@ func (c *concord) propose(ctx context.Context, data Data) error {
 func (c *concord) isProposer() bool {
 	return bytes.Equal(c.valSet.GetProposer().Address, c.valSelfPK.Address())
 }
-
-func (c *concord) publish(ctx context.Context, message Message) error {
-	proto, err := MsgToProto(message)
-	if err != nil {
-		return err
-	}
-
-	bin, err := proto.Marshal()
-	if err != nil {
-		return err
-	}
-
-	return c.topic.Publish(ctx, bin)
-}
-
-
-
-
