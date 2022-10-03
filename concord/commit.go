@@ -12,7 +12,7 @@ import (
 	"github.com/tendermint/tendermint/libs/bits"
 	tmbytes "github.com/tendermint/tendermint/libs/bytes"
 	tmmath "github.com/tendermint/tendermint/libs/math"
-	tmproto "github.com/tendermint/tendermint/proto/tendermint/types"
+	"github.com/Wondertan/iotwal/concord/pb"
 )
 
 var (
@@ -56,7 +56,7 @@ func NewCommit(height int64, round int32, blockID BlockID, commitSigs []CommitSi
 // Panics if signatures from the commit can't be added to the voteset.
 // Inverse of VoteSet.MakeCommit().
 func CommitToVoteSet(chainID string, commit *Commit, vals *ValidatorSet) *VoteSet {
-	voteSet := NewVoteSet(chainID, commit.Height, commit.Round, tmproto.PrecommitType, vals)
+	voteSet := NewVoteSet(chainID, commit.Height, commit.Round, pb.PrecommitType, vals)
 	for idx, commitSig := range commit.Signatures {
 		if commitSig.Absent() {
 			continue // OK, some precommits can be missing.
@@ -75,7 +75,7 @@ func CommitToVoteSet(chainID string, commit *Commit, vals *ValidatorSet) *VoteSe
 func (commit *Commit) GetVote(valIdx int32) *Vote {
 	commitSig := commit.Signatures[valIdx]
 	return &Vote{
-		Type:             tmproto.PrecommitType,
+		Type:             pb.PrecommitType,
 		Height:           commit.Height,
 		Round:            commit.Round,
 		BlockID:          commitSig.BlockID(commit.BlockID),
@@ -103,7 +103,7 @@ func (commit *Commit) VoteSignBytes(chainID string, valIdx int32) []byte {
 // Type returns the vote type of the commit, which is always VoteTypePrecommit
 // Implements VoteSetReader.
 func (commit *Commit) Type() byte {
-	return byte(tmproto.PrecommitType)
+	return byte(pb.PrecommitType)
 }
 
 // GetHeight returns height of the commit.
@@ -227,13 +227,13 @@ func (commit *Commit) StringIndented(indent string) string {
 }
 
 // ToProto converts Commit to protobuf
-func (commit *Commit) ToProto() *tmproto.Commit {
+func (commit *Commit) ToProto() *pb.Commit {
 	if commit == nil {
 		return nil
 	}
 
-	c := new(tmproto.Commit)
-	sigs := make([]tmproto.CommitSig, len(commit.Signatures))
+	c := new(pb.Commit)
+	sigs := make([]pb.CommitSig, len(commit.Signatures))
 	for i := range commit.Signatures {
 		sigs[i] = *commit.Signatures[i].ToProto()
 	}
@@ -248,7 +248,7 @@ func (commit *Commit) ToProto() *tmproto.Commit {
 
 // FromProto sets a protobuf Commit to the given pointer.
 // It returns an error if the commit is invalid.
-func CommitFromProto(cp *tmproto.Commit) (*Commit, error) {
+func CommitFromProto(cp *pb.Commit) (*Commit, error) {
 	if cp == nil {
 		return nil, errors.New("nil Commit")
 	}
@@ -412,13 +412,13 @@ func (cs CommitSig) ValidateBasic() error {
 }
 
 // ToProto converts CommitSig to protobuf
-func (cs *CommitSig) ToProto() *tmproto.CommitSig {
+func (cs *CommitSig) ToProto() *pb.CommitSig {
 	if cs == nil {
 		return nil
 	}
 
-	return &tmproto.CommitSig{
-		BlockIdFlag:      tmproto.BlockIDFlag(cs.BlockIDFlag),
+	return &pb.CommitSig{
+		BlockIdFlag:      pb.BlockIDFlag(cs.BlockIDFlag),
 		ValidatorAddress: cs.ValidatorAddress,
 		Timestamp:        cs.Timestamp,
 		Signature:        cs.Signature,
@@ -427,7 +427,7 @@ func (cs *CommitSig) ToProto() *tmproto.CommitSig {
 
 // FromProto sets a protobuf CommitSig to the given pointer.
 // It returns an error if the CommitSig is invalid.
-func (cs *CommitSig) FromProto(csp tmproto.CommitSig) error {
+func (cs *CommitSig) FromProto(csp pb.CommitSig) error {
 
 	cs.BlockIDFlag = BlockIDFlag(csp.BlockIdFlag)
 	cs.ValidatorAddress = csp.ValidatorAddress

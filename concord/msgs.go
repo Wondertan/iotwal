@@ -4,10 +4,9 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/Wondertan/iotwal/concord/pb"
 	"github.com/gogo/protobuf/proto"
 	"github.com/tendermint/tendermint/libs/bits"
-	tmcons "github.com/tendermint/tendermint/proto/tendermint/consensus"
-	tmproto "github.com/tendermint/tendermint/proto/tendermint/types"
 )
 
 //-----------------------------------------------------------------------------
@@ -20,7 +19,7 @@ type Message interface {
 
 
 func decodeMsg(bz []byte) (msg Message, err error) {
-	pb := &tmcons.Message{}
+	pb := &pb.Message{}
 	if err = proto.Unmarshal(bz, pb); err != nil {
 		return msg, err
 	}
@@ -186,7 +185,7 @@ func (m *VoteMessage) String() string {
 type HasVoteMessage struct {
 	Height int64
 	Round  int32
-	Type   tmproto.SignedMsgType
+	Type   pb.SignedMsgType
 	Index  int32
 }
 
@@ -218,7 +217,7 @@ func (m *HasVoteMessage) String() string {
 type VoteSetMaj23Message struct {
 	Height  int64
 	Round   int32
-	Type    tmproto.SignedMsgType
+	Type    pb.SignedMsgType
 	BlockID BlockID
 }
 
@@ -250,7 +249,7 @@ func (m *VoteSetMaj23Message) String() string {
 type VoteSetBitsMessage struct {
 	Height  int64
 	Round   int32
-	Type    tmproto.SignedMsgType
+	Type    pb.SignedMsgType
 	BlockID BlockID
 	Votes   *bits.BitArray
 }

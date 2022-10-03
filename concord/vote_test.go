@@ -8,19 +8,19 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/Wondertan/iotwal/concord/pb"
 	"github.com/tendermint/tendermint/crypto"
 	"github.com/tendermint/tendermint/crypto/ed25519"
 	"github.com/tendermint/tendermint/crypto/tmhash"
 	"github.com/tendermint/tendermint/libs/protoio"
-	tmproto "github.com/tendermint/tendermint/proto/tendermint/types"
 )
 
 func examplePrevote() *Vote {
-	return exampleVote(byte(tmproto.PrevoteType))
+	return exampleVote(byte(pb.PrevoteType))
 }
 
 func examplePrecommit() *Vote {
-	return exampleVote(byte(tmproto.PrecommitType))
+	return exampleVote(byte(pb.PrecommitType))
 }
 
 func exampleVote(t byte) *Vote {
@@ -30,7 +30,7 @@ func exampleVote(t byte) *Vote {
 	}
 
 	return &Vote{
-		Type:      tmproto.SignedMsgType(t),
+		Type:      pb.SignedMsgType(t),
 		Height:    12345,
 		Round:     2,
 		Timestamp: stamp,
@@ -67,7 +67,7 @@ func TestVoteSignBytesTestVectors(t *testing.T) {
 		},
 		// with proper (fixed size) height and round (PreCommit):
 		1: {
-			"", &Vote{Height: 1, Round: 1, Type: tmproto.PrecommitType},
+			"", &Vote{Height: 1, Round: 1, Type: pb.PrecommitType},
 			[]byte{
 				0x21,                                   // length
 				0x8,                                    // (field_number << 3) | wire_type
@@ -82,7 +82,7 @@ func TestVoteSignBytesTestVectors(t *testing.T) {
 		},
 		// with proper (fixed size) height and round (PreVote):
 		2: {
-			"", &Vote{Height: 1, Round: 1, Type: tmproto.PrevoteType},
+			"", &Vote{Height: 1, Round: 1, Type: pb.PrevoteType},
 			[]byte{
 				0x21,                                   // length
 				0x8,                                    // (field_number << 3) | wire_type
@@ -133,8 +133,8 @@ func TestVoteSignBytesTestVectors(t *testing.T) {
 }
 
 func TestVoteProposalNotEq(t *testing.T) {
-	cv := CanonicalizeVote("", &tmproto.Vote{Height: 1, Round: 1})
-	p := CanonicalizeProposal("", &tmproto.Proposal{Height: 1, Round: 1})
+	cv := CanonicalizeVote("", &pb.Vote{Height: 1, Round: 1})
+	p := CanonicalizeProposal("", &pb.Proposal{Height: 1, Round: 1})
 	vb, err := proto.Marshal(&cv)
 	require.NoError(t, err)
 	pb, err := proto.Marshal(&p)
@@ -160,7 +160,7 @@ func TestVoteVerifySignature(t *testing.T) {
 	require.True(t, valid)
 
 	// serialize, deserialize and verify again....
-	precommit := new(tmproto.Vote)
+	precommit := new(pb.Vote)
 	bs, err := proto.Marshal(v)
 	require.NoError(t, err)
 	err = proto.Unmarshal(bs, precommit)
@@ -176,12 +176,12 @@ func TestVoteVerifySignature(t *testing.T) {
 func TestIsVoteTypeValid(t *testing.T) {
 	tc := []struct {
 		name string
-		in   tmproto.SignedMsgType
+		in   pb.SignedMsgType
 		out  bool
 	}{
-		{"Prevote", tmproto.PrevoteType, true},
-		{"Precommit", tmproto.PrecommitType, true},
-		{"InvalidType", tmproto.SignedMsgType(0x3), false},
+		{"Prevote", pb.PrevoteType, true},
+		{"Precommit", pb.PrecommitType, true},
+		{"InvalidType", pb.SignedMsgType(0x3), false},
 	}
 
 	for _, tt := range tc {

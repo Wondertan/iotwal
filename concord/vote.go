@@ -6,10 +6,10 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/Wondertan/iotwal/concord/pb"
 	"github.com/tendermint/tendermint/crypto"
 	tmbytes "github.com/tendermint/tendermint/libs/bytes"
 	"github.com/tendermint/tendermint/libs/protoio"
-	tmproto "github.com/tendermint/tendermint/proto/tendermint/types"
 )
 
 const (
@@ -48,7 +48,7 @@ type Address = crypto.Address
 // Vote represents a prevote, precommit, or commit vote from validators for
 // consensus.
 type Vote struct {
-	Type             tmproto.SignedMsgType `json:"type"`
+	Type             pb.SignedMsgType `json:"type"`
 	Height           int64                 `json:"height"`
 	Round            int32                 `json:"round"`    // assume there will not be greater than 2_147_483_647 rounds
 	BlockID          BlockID               `json:"block_id"` // zero if vote is nil.
@@ -90,7 +90,7 @@ func (vote *Vote) CommitSig() CommitSig {
 // devices that rely on this encoding.
 //
 // See CanonicalizeVote
-func VoteSignBytes(chainID string, vote *tmproto.Vote) []byte {
+func VoteSignBytes(chainID string, vote *pb.Vote) []byte {
 	pb := CanonicalizeVote(chainID, vote)
 	bz, err := protoio.MarshalDelimited(&pb)
 	if err != nil {
@@ -123,9 +123,9 @@ func (vote *Vote) String() string {
 
 	var typeString string
 	switch vote.Type {
-	case tmproto.PrevoteType:
+	case pb.PrevoteType:
 		typeString = "Prevote"
-	case tmproto.PrecommitType:
+	case pb.PrecommitType:
 		typeString = "Precommit"
 	default:
 		panic("Unknown vote type")
@@ -203,12 +203,12 @@ func (vote *Vote) ValidateBasic() error {
 
 // ToProto converts the handwritten type to proto generated type
 // return type, nil if everything converts safely, otherwise nil, error
-func (vote *Vote) ToProto() *tmproto.Vote {
+func (vote *Vote) ToProto() *pb.Vote {
 	if vote == nil {
 		return nil
 	}
 
-	return &tmproto.Vote{
+	return &pb.Vote{
 		Type:             vote.Type,
 		Height:           vote.Height,
 		Round:            vote.Round,
@@ -222,7 +222,7 @@ func (vote *Vote) ToProto() *tmproto.Vote {
 
 // FromProto converts a proto generetad type to a handwritten type
 // return type, nil if everything converts safely, otherwise nil, error
-func VoteFromProto(pv *tmproto.Vote) (*Vote, error) {
+func VoteFromProto(pv *pb.Vote) (*Vote, error) {
 	if pv == nil {
 		return nil, errors.New("nil vote")
 	}
@@ -246,9 +246,9 @@ func VoteFromProto(pv *tmproto.Vote) (*Vote, error) {
 }
 
 // IsVoteTypeValid returns true if t is a valid vote type.
-func IsVoteTypeValid(t tmproto.SignedMsgType) bool {
+func IsVoteTypeValid(t pb.SignedMsgType) bool {
 	switch t {
-	case tmproto.PrevoteType, tmproto.PrecommitType:
+	case pb.PrevoteType, pb.PrecommitType:
 		return true
 	default:
 		return false

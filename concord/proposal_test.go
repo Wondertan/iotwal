@@ -8,15 +8,15 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/Wondertan/iotwal/concord/pb"
 	"github.com/tendermint/tendermint/crypto/tmhash"
 	"github.com/tendermint/tendermint/libs/protoio"
 	tmrand "github.com/tendermint/tendermint/libs/rand"
-	tmproto "github.com/tendermint/tendermint/proto/tendermint/types"
 )
 
 var (
 	testProposal *Proposal
-	pbp          *tmproto.Proposal
+	pbp          *pb.Proposal
 )
 
 func init() {
@@ -74,7 +74,7 @@ func TestProposalVerifySignature(t *testing.T) {
 	require.True(t, valid)
 
 	// serialize, deserialize and verify again....
-	newProp := new(tmproto.Proposal)
+	newProp := new(pb.Proposal)
 	pb := prop.ToProto()
 
 	bs, err := proto.Marshal(pb)
@@ -130,7 +130,7 @@ func TestProposalValidateBasic(t *testing.T) {
 		expectErr        bool
 	}{
 		{"Good Proposal", func(p *Proposal) {}, false},
-		{"Invalid Type", func(p *Proposal) { p.Type = tmproto.PrecommitType }, true},
+		{"Invalid Type", func(p *Proposal) { p.Type = pb.PrecommitType }, true},
 		{"Invalid Height", func(p *Proposal) { p.Height = -1 }, true},
 		{"Invalid Round", func(p *Proposal) { p.Round = -1 }, true},
 		{"Invalid POLRound", func(p *Proposal) { p.POLRound = -2 }, true},
