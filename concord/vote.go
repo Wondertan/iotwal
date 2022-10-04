@@ -58,7 +58,7 @@ type Vote struct {
 	Signature        []byte                `json:"signature"`
 }
 
-func NewVote(round int32, blockID *BlockID) *Vote {
+func NewVote(t tmproto.SignedMsgType, round int32, blockID *BlockID) *Vote {
 	return &Vote{Type: tmproto.PrevoteType, Round: round, BlockID: *blockID, Timestamp: time.Now()}
 }
 
