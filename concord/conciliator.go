@@ -41,7 +41,6 @@ func (c *concord) AgreeOn(ctx context.Context, data Data) (Data, error) {
 		}
 	}
 
-	c.waitProposal()
 	return data, nil
 }
 
@@ -62,12 +61,9 @@ func (c *concord) propose(ctx context.Context, data Data) error {
 	}
 	prop.Signature = pprop.Signature
 
-	return c.publish(ctx, &ProposalMessage{Proposal: prop})
+	return nil
 }
 
-func (c *concord) waitProposal() *Proposal {
-
-}
 
 func (c *concord) isProposer() bool {
 	return bytes.Equal(c.valSet.GetProposer().Address, c.valSelfPK.Address())

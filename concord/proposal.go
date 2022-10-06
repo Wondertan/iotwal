@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/Wondertan/iotwal/concord/pb"
 	tmbytes "github.com/tendermint/tendermint/libs/bytes"
 	"github.com/tendermint/tendermint/libs/protoio"
-	tmproto "github.com/tendermint/tendermint/proto/tendermint/types"
 	tmtime "github.com/tendermint/tendermint/types/time"
 )
 
@@ -23,7 +23,7 @@ var (
 // a so-called Proof-of-Lock (POL) round, as noted in the POLRound.
 // If POLRound >= 0, then BlockID corresponds to the block that is locked in POLRound.
 type Proposal struct {
-	Type      tmproto.SignedMsgType
+	Type      pb.SignedMsgType
 	Height    int64     `json:"height"`
 	Round     int32     `json:"round"`     // there can not be greater than 2_147_483_647 rounds
 	POLRound  int32     `json:"pol_round"` // -1 if null.
@@ -36,7 +36,7 @@ type Proposal struct {
 // If there is no POLRound, polRound should be -1.
 func NewProposal(height int64, round int32, polRound int32, blockID BlockID) *Proposal {
 	return &Proposal{
-		Type:      tmproto.ProposalType,
+		Type:      pb.ProposalType,
 		Height:    height,
 		Round:     round,
 		BlockID:   blockID,
@@ -47,7 +47,7 @@ func NewProposal(height int64, round int32, polRound int32, blockID BlockID) *Pr
 
 // ValidateBasic performs basic validation.
 func (p *Proposal) ValidateBasic() error {
-	if p.Type != tmproto.ProposalType {
+	if p.Type != pb.ProposalType {
 		return errors.New("invalid Type")
 	}
 	if p.Height < 0 {
@@ -107,7 +107,7 @@ func (p *Proposal) String() string {
 // devices that rely on this encoding.
 //
 // See CanonicalizeProposal
-func ProposalSignBytes(chainID string, p *tmproto.Proposal) []byte {
+func ProposalSignBytes(chainID string, p *pb.Proposal) []byte {
 	pb := CanonicalizeProposal(chainID, p)
 	bz, err := protoio.MarshalDelimited(&pb)
 	if err != nil {
@@ -118,11 +118,11 @@ func ProposalSignBytes(chainID string, p *tmproto.Proposal) []byte {
 }
 
 // ToProto converts Proposal to protobuf
-func (p *Proposal) ToProto() *tmproto.Proposal {
+func (p *Proposal) ToProto() *pb.Proposal {
 	if p == nil {
-		return &tmproto.Proposal{}
+		return &pb.Proposal{}
 	}
-	pb := new(tmproto.Proposal)
+	pb := new(pb.Proposal)
 
 	pb.BlockID = p.BlockID.ToProto()
 	pb.Type = p.Type
@@ -137,7 +137,7 @@ func (p *Proposal) ToProto() *tmproto.Proposal {
 
 // FromProto sets a protobuf Proposal to the given pointer.
 // It returns an error if the proposal is invalid.
-func ProposalFromProto(pp *tmproto.Proposal) (*Proposal, error) {
+func ProposalFromProto(pp *pb.Proposal) (*Proposal, error) {
 	if pp == nil {
 		return nil, errors.New("nil proposal")
 	}

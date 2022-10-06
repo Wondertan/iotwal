@@ -5,12 +5,11 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/Wondertan/iotwal/concord/pb"
 	"github.com/tendermint/tendermint/crypto/tmhash"
 	tmbytes "github.com/tendermint/tendermint/libs/bytes"
-	tmproto "github.com/tendermint/tendermint/proto/tendermint/types"
 )
 
-// TODO: PartSet removed - remove it and from Proto
 type BlockID struct {
 	Hash          tmbytes.HexBytes `json:"hash"`
 }
@@ -55,19 +54,19 @@ func (blockID BlockID) String() string {
 }
 
 // ToProto converts BlockID to protobuf
-func (blockID *BlockID) ToProto() tmproto.BlockID {
+func (blockID *BlockID) ToProto() pb.BlockID {
 	if blockID == nil {
-		return tmproto.BlockID{}
+		return pb.BlockID{}
 	}
 
-	return tmproto.BlockID{
+	return pb.BlockID{
 		Hash:          blockID.Hash,
 	}
 }
 
 // FromProto sets a protobuf BlockID to the given pointer.
 // It returns an error if the block id is invalid.
-func BlockIDFromProto(bID *tmproto.BlockID) (*BlockID, error) {
+func BlockIDFromProto(bID *pb.BlockID) (*BlockID, error) {
 	if bID == nil {
 		return nil, errors.New("nil BlockID")
 	}

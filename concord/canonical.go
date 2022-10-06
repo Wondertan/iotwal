@@ -3,7 +3,7 @@ package concord
 import (
 	"time"
 
-	tmproto "github.com/tendermint/tendermint/proto/tendermint/types"
+	"github.com/Wondertan/iotwal/concord/pb"
 	tmtime "github.com/tendermint/tendermint/types/time"
 )
 
@@ -15,33 +15,27 @@ const TimeFormat = time.RFC3339Nano
 //-----------------------------------
 // Canonicalize the structs
 
-func CanonicalizeBlockID(bid tmproto.BlockID) *tmproto.CanonicalBlockID {
+func CanonicalizeBlockID(bid pb.BlockID) *pb.CanonicalBlockID {
 	rbid, err := BlockIDFromProto(&bid)
 	if err != nil {
 		panic(err)
 	}
-	var cbid *tmproto.CanonicalBlockID
+	var cbid *pb.CanonicalBlockID
 	if rbid == nil || rbid.IsZero() {
 		cbid = nil
 	} else {
-		cbid = &tmproto.CanonicalBlockID{
+		cbid = &pb.CanonicalBlockID{
 			Hash:          bid.Hash,
-			PartSetHeader: CanonicalizePartSetHeader(bid.PartSetHeader),
 		}
 	}
 
 	return cbid
 }
 
-// CanonicalizeVote transforms the given PartSetHeader to a CanonicalPartSetHeader.
-func CanonicalizePartSetHeader(psh tmproto.PartSetHeader) tmproto.CanonicalPartSetHeader {
-	return tmproto.CanonicalPartSetHeader(psh)
-}
-
 // CanonicalizeVote transforms the given Proposal to a CanonicalProposal.
-func CanonicalizeProposal(chainID string, proposal *tmproto.Proposal) tmproto.CanonicalProposal {
-	return tmproto.CanonicalProposal{
-		Type:      tmproto.ProposalType,
+func CanonicalizeProposal(chainID string, proposal *pb.Proposal) pb.CanonicalProposal {
+	return pb.CanonicalProposal{
+		Type:      pb.ProposalType,
 		Height:    proposal.Height,       // encoded as sfixed64
 		Round:     int64(proposal.Round), // encoded as sfixed64
 		POLRound:  int64(proposal.PolRound),
@@ -53,8 +47,8 @@ func CanonicalizeProposal(chainID string, proposal *tmproto.Proposal) tmproto.Ca
 
 // CanonicalizeVote transforms the given Vote to a CanonicalVote, which does
 // not contain ValidatorIndex and ValidatorAddress fields.
-func CanonicalizeVote(chainID string, vote *tmproto.Vote) tmproto.CanonicalVote {
-	return tmproto.CanonicalVote{
+func CanonicalizeVote(chainID string, vote *pb.Vote) pb.CanonicalVote {
+	return pb.CanonicalVote{
 		Type:      vote.Type,
 		Height:    vote.Height,       // encoded as sfixed64
 		Round:     int64(vote.Round), // encoded as sfixed64
