@@ -4,19 +4,22 @@ import (
 	"bytes"
 	"context"
 
+	"github.com/libp2p/go-libp2p-core/peer"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/tendermint/tendermint/crypto"
-	tmproto "github.com/tendermint/tendermint/proto/tendermint/types"
+
+	"github.com/Wondertan/iotwal/concord/pb"
 )
 
 type executor interface {
 	// execute creates and publishes prevote and precommit votes
-	execute(context.Context, tmproto.SignedMsgType)
+	execute(context.Context, pb.SignedMsgType)
 }
 
 type Round interface {
 	executor
-	// Propose takes a proposal block and gossipes it through the network.
+	voter
+	// Propose takes a proposal block and gossips it through the network.
 	Propose(context.Context, Data)
 
 	addProposedBlock(*BlockID)
@@ -36,14 +39,21 @@ func newValinfo(set *ValidatorSet, valSelf PrivValidator, key crypto.PubKey) *va
 
 type round struct {
 	concordId      string
-	lastValidRound int32
+	lastValidRound int64
 	topic          *pubsub.Topic
 	valInfo        *valInfo
 	proposalBlock  *BlockID
+	votes          *HeightVoteSet
 }
 
-func newRound(concordId string, lastValidRound int32, topic *pubsub.Topic, info *valInfo) Round {
-	return &round{concordId: concordId, lastValidRound: lastValidRound, topic: topic, valInfo: info}
+func newRound(concordId string, lastValidRound int64, topic *pubsub.Topic, info *valInfo) Round {
+	return &round{
+		concordId:      concordId,
+		lastValidRound: lastValidRound,
+		topic:          topic,
+		valInfo:        info,
+		votes:          NewHeightVoteSet(concordId, lastValidRound+1, info.valSet),
+	}
 }
 
 func (r *round) Propose(ctx context.Context, data Data) {
@@ -56,7 +66,7 @@ func (r *round) Propose(ctx context.Context, data Data) {
 
 func (r *round) propose(ctx context.Context, data Data) error {
 	r.proposalBlock = &BlockID{Hash: data.Hash()}
-	prop := NewProposal(0, r.lastValidRound+1, r.lastValidRound, *r.proposalBlock)
+	prop := NewProposal(0, int32(r.lastValidRound+1), int32(r.lastValidRound), *r.proposalBlock)
 	pprop := prop.ToProto()
 
 	err := r.valInfo.valSelf.SignProposal(r.concordId, pprop)
@@ -75,8 +85,8 @@ func (r *round) isProposer() bool {
 	return bytes.Equal(r.valInfo.valSet.GetProposer().Address, r.valInfo.valSelfPK.Address())
 }
 
-func (r *round) execute(ctx context.Context, msgType tmproto.SignedMsgType) {
-	vote := NewVote(msgType, r.lastValidRound+1, r.proposalBlock)
+func (r *round) execute(ctx context.Context, msgType pb.SignedMsgType) {
+	vote := NewVote(msgType, int32(r.lastValidRound+1), r.proposalBlock)
 	proto := vote.ToProto()
 	err := r.valInfo.valSelf.SignVote(r.concordId, proto)
 	if err != nil {
@@ -91,7 +101,7 @@ func (r *round) execute(ctx context.Context, msgType tmproto.SignedMsgType) {
 
 func (r *round) addProposedBlock(b *BlockID) {
 	if r.isProposer() {
-		// ensure that nobody changed choosen block
+		// ensure that nobody changed chosen block
 		if bytes.Equal(b.Hash, r.proposalBlock.Hash) {
 			panic("invalid proposed block")
 		}
@@ -102,6 +112,23 @@ func (r *round) addProposedBlock(b *BlockID) {
 
 func (r *round) proposedBlock() *BlockID {
 	return r.proposalBlock
+}
+
+func (r *round) addVote(vote *Vote, p peer.ID) (bool, error) {
+	if vote.Height == r.lastValidRound && vote.Type == pb.PrecommitType {
+		log.Debug("received vote for the previous round")
+		return false, nil // TODO: make be return a specific error???
+	}
+
+	return r.votes.AddVote(vote, p)
+}
+
+func (r *round) preVotes(round int32) *VoteSet {
+	return r.votes.Prevotes(round)
+}
+
+func (r *round) preCommits(round int32) *VoteSet {
+	return r.votes.Precommits(round)
 }
 
 func (r *round) publish(ctx context.Context, message Message) error {

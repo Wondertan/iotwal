@@ -6,15 +6,24 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/Wondertan/iotwal/concord/pb"
+	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/tendermint/tendermint/crypto"
 	tmbytes "github.com/tendermint/tendermint/libs/bytes"
 	"github.com/tendermint/tendermint/libs/protoio"
+
+	"github.com/Wondertan/iotwal/concord/pb"
 )
 
 const (
 	nilVoteStr string = "nil-Vote"
 )
+
+type voter interface {
+	addVote(*Vote, peer.ID) (bool, error)
+
+	preCommits(int32) *VoteSet
+	preVotes(int32) *VoteSet
+}
 
 var (
 	ErrVoteUnexpectedStep            = errors.New("unexpected step")
@@ -49,17 +58,17 @@ type Address = crypto.Address
 // consensus.
 type Vote struct {
 	Type             pb.SignedMsgType `json:"type"`
-	Height           int64                 `json:"height"`
-	Round            int32                 `json:"round"`    // assume there will not be greater than 2_147_483_647 rounds
-	BlockID          BlockID               `json:"block_id"` // zero if vote is nil.
-	Timestamp        time.Time             `json:"timestamp"`
-	ValidatorAddress Address               `json:"validator_address"`
-	ValidatorIndex   int32                 `json:"validator_index"`
-	Signature        []byte                `json:"signature"`
+	Height           int64            `json:"height"`
+	Round            int32            `json:"round"`    // assume there will not be greater than 2_147_483_647 rounds
+	BlockID          BlockID          `json:"block_id"` // zero if vote is nil.
+	Timestamp        time.Time        `json:"timestamp"`
+	ValidatorAddress Address          `json:"validator_address"`
+	ValidatorIndex   int32            `json:"validator_index"`
+	Signature        []byte           `json:"signature"`
 }
 
-func NewVote(t tmproto.SignedMsgType, round int32, blockID *BlockID) *Vote {
-	return &Vote{Type: tmproto.PrevoteType, Round: round, BlockID: *blockID, Timestamp: time.Now()}
+func NewVote(t pb.SignedMsgType, round int32, blockID *BlockID) *Vote {
+	return &Vote{Type: pb.PrevoteType, Round: round, BlockID: *blockID, Timestamp: time.Now()}
 }
 
 // CommitSig converts the Vote to a CommitSig.
