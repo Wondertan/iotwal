@@ -23,8 +23,8 @@ type Round interface {
 
 	addVote(*Vote, peer.ID) (bool, error)
 
-	preCommits(int32) *VoteSet
-	preVotes(int32) *VoteSet
+	preCommits() *VoteSet
+	preVotes() *VoteSet
 
 	addProposedBlock(*BlockID)
 	proposedBlock() *BlockID
@@ -127,12 +127,12 @@ func (r *round) addVote(vote *Vote, p peer.ID) (bool, error) {
 	return r.votes.AddVote(vote, p)
 }
 
-func (r *round) preVotes(round int32) *VoteSet {
-	return r.votes.Prevotes(round)
+func (r *round) preVotes() *VoteSet {
+	return r.votes.Prevotes(0)
 }
 
-func (r *round) preCommits(round int32) *VoteSet {
-	return r.votes.Precommits(round)
+func (r *round) preCommits() *VoteSet {
+	return r.votes.Precommits(0)
 }
 
 func (r *round) publish(ctx context.Context, message Message) error {
