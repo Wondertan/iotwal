@@ -12,19 +12,17 @@ import (
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 )
 
-type ValidatorStore interface {
-	Get(context.Context, string) (*ValidatorSet, error)
-	Save(context.Context, string, *ValidatorSet) error
+type ProposerStore interface {
+	Get(context.Context, string) (*ProposerSet, error)
+	Save(context.Context, string, *ProposerSet) error
 }
 
-// TODD: Rename Validator to Proposer
-// TODO: Rename to just Validator
-type ProposalValidator func([]byte) bool
+type Validator func([]byte) bool
 
 type conciliator struct {
 	pubsub *pubsub.PubSub
 
-	valStore ValidatorStore
+	valStore ProposerStore
 	valSelf  PrivValidator
 }
 
@@ -35,11 +33,11 @@ type concord struct {
 	roundMu sync.Mutex
 	round   *round
 
-	validate ProposalValidator
-	valInfo  *valInfo
+	validate Validator
+	valInfo  *propInfo
 }
 
-func (c *conciliator) newConcord(ctx context.Context, id string, pv ProposalValidator) (*concord, error) {
+func (c *conciliator) newConcord(ctx context.Context, id string, pv Validator) (*concord, error) {
 	tpc, err := c.pubsub.Join(id)
 	if err != nil {
 		return nil, err
@@ -59,7 +57,7 @@ func (c *conciliator) newConcord(ctx context.Context, id string, pv ProposalVali
 		id:       id,
 		topic:    tpc,
 		validate: pv,
-		valInfo:  &valInfo{valSet, c.valSelf, pk},
+		valInfo:  &propInfo{valSet, c.valSelf, pk},
 	}
 	return cord, c.pubsub.RegisterTopicValidator(id, cord.incoming)
 }

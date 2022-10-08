@@ -101,9 +101,9 @@ func (pv MockPV) SignProposal(chainID string, proposal *pb.Proposal) error {
 	return nil
 }
 
-func (pv MockPV) ExtractIntoValidator(votingPower int64) *Validator {
+func (pv MockPV) ExtractIntoValidator(votingPower int64) *Proposer {
 	pubKey, _ := pv.GetPubKey()
-	return &Validator{
+	return &Proposer{
 		Address:     pubKey.Address(),
 		PubKey:      pubKey,
 		VotingPower: votingPower,

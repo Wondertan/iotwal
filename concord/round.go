@@ -26,17 +26,16 @@ type Round interface {
 	proposedBlock() *BlockID
 }
 
-// temp solution. should be moved to concord
-type valInfo struct {
-	valSet    *ValidatorSet
-	valSelf   PrivValidator
-	valSelfPK crypto.PubKey
+type propInfo struct {
+	set       *ProposerSet
+	self   PrivValidator
+	selfPK crypto.PubKey
 }
 
 type round struct {
 	concordId      string
 	topic          *pubsub.Topic
-	valInfo        *valInfo
+	valInfo        *propInfo
 	proposalBlock  *BlockID
 	votes          *HeightVoteSet
 
@@ -45,7 +44,7 @@ type round struct {
 	waitProp chan []byte // marshalled Data
 }
 
-func newRound(concordId string, topic *pubsub.Topic, info *valInfo) *round {
+func newRound(concordId string, topic *pubsub.Topic, info *propInfo) *round {
 	return &round{
 		concordId: concordId,
 		topic: topic,
@@ -80,7 +79,7 @@ func (r *round) propose(ctx context.Context, data Data) error {
 	prop := NewProposal(0, r.round, r.round, BlockID{}, bin)
 	pprop := prop.ToProto()
 
-	err = r.valInfo.valSelf.SignProposal(r.concordId, pprop)
+	err = r.valInfo.self.SignProposal(r.concordId, pprop)
 	if err != nil {
 		return err
 	}
@@ -89,13 +88,13 @@ func (r *round) propose(ctx context.Context, data Data) error {
 }
 
 func (r *round) isProposer() bool {
-	return bytes.Equal(r.valInfo.valSet.GetProposer().Address, r.valInfo.valSelfPK.Address())
+	return bytes.Equal(r.valInfo.set.GetProposer().Address, r.valInfo.selfPK.Address())
 }
 
 func (r *round) execute(ctx context.Context, msgType pb.SignedMsgType) {
 	vote := NewVote(msgType, r.round, r.proposalBlock)
 	proto := vote.ToProto()
-	err := r.valInfo.valSelf.SignVote(r.concordId, proto)
+	err := r.valInfo.self.SignVote(r.concordId, proto)
 	if err != nil {
 		panic(err)
 	}
@@ -167,7 +166,7 @@ func (r *round) rcvProposal(ctx context.Context, prop *Proposal) error {
 	}
 
 	// TODO Verify POLRound
-	proper := r.valInfo.valSet.GetProposer().PubKey
+	proper := r.valInfo.set.GetProposer().PubKey
 	if !proper.VerifySignature(ProposalSignBytes(r.concordId, prop.ToProto()), prop.Signature) {
 		return ErrProposalSignature
 	}

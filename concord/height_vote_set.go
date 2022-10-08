@@ -26,7 +26,7 @@ var (
 )
 
 /*
-Keeps track of all VoteSets from round 0 to round 'round'.
+HeightVoteSet keeps track of all VoteSets from round 0 to round 'round'.
 
 Also keeps track of up to one RoundVoteSet greater than
 'round' from each peer, to facilitate catchup syncing of commits.
@@ -42,7 +42,7 @@ One for their LastCommit round, and another for the official commit round.
 type HeightVoteSet struct {
 	chainID string
 	height  int64
-	valSet  *ValidatorSet
+	valSet  *ProposerSet
 
 	mtx               sync.Mutex
 	round             int32                  // max tracked round
@@ -50,7 +50,7 @@ type HeightVoteSet struct {
 	peerCatchupRounds map[peer.ID][]int32    // keys: peer.ID; values: at most 2 rounds
 }
 
-func NewHeightVoteSet(chainID string, height int64, valSet *ValidatorSet) *HeightVoteSet {
+func NewHeightVoteSet(chainID string, height int64, valSet *ProposerSet) *HeightVoteSet {
 	hvs := &HeightVoteSet{
 		chainID: chainID,
 	}
@@ -58,7 +58,7 @@ func NewHeightVoteSet(chainID string, height int64, valSet *ValidatorSet) *Heigh
 	return hvs
 }
 
-func (hvs *HeightVoteSet) Reset(height int64, valSet *ValidatorSet) {
+func (hvs *HeightVoteSet) Reset(height int64, valSet *ProposerSet) {
 	hvs.mtx.Lock()
 	defer hvs.mtx.Unlock()
 
@@ -83,7 +83,7 @@ func (hvs *HeightVoteSet) Round() int32 {
 	return hvs.round
 }
 
-// Create more RoundVoteSets up to round.
+// SetRound create more RoundVoteSets up to round.
 func (hvs *HeightVoteSet) SetRound(round int32) {
 	hvs.mtx.Lock()
 	defer hvs.mtx.Unlock()
@@ -113,7 +113,7 @@ func (hvs *HeightVoteSet) addRound(round int32) {
 	}
 }
 
-// Duplicate votes return added=false, err=nil.
+// AddVote duplicate votes return added=false, err=nil.
 // By convention, peerID is "" if origin is self.
 func (hvs *HeightVoteSet) AddVote(vote *Vote, peerID peer.ID) (added bool, err error) {
 	hvs.mtx.Lock()
@@ -149,7 +149,7 @@ func (hvs *HeightVoteSet) Precommits(round int32) *VoteSet {
 	return hvs.getVoteSet(round, pb.PrecommitType)
 }
 
-// Last round and blockID that has +2/3 prevotes for a particular block or nil.
+// POLInfo last round and blockID that has +2/3 prevotes for a particular block or nil.
 // Returns -1 if no such round exists.
 func (hvs *HeightVoteSet) POLInfo() (polRound int32, polBlockID BlockID) {
 	hvs.mtx.Lock()
@@ -179,7 +179,7 @@ func (hvs *HeightVoteSet) getVoteSet(round int32, voteType pb.SignedMsgType) *Vo
 	}
 }
 
-// If a peer claims that it has 2/3 majority for given blockKey, call this.
+// SetPeerMaj23 if a peer claims that it has 2/3 majority for given blockKey, call this.
 // NOTE: if there are too many peers, or too much peer churn,
 // this can cause memory issues.
 // TODO: implement ability to remove peers too

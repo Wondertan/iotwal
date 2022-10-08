@@ -48,7 +48,7 @@ func signAddVote(privVal PrivValidator, vote *Vote, voteSet *VoteSet) (signed bo
 func MakeVote(
 	height int64,
 	blockID BlockID,
-	valSet *ValidatorSet,
+	valSet *ProposerSet,
 	privVal PrivValidator,
 	chainID string,
 	now time.Time,
