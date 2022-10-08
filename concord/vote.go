@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/tendermint/tendermint/crypto"
 	tmbytes "github.com/tendermint/tendermint/libs/bytes"
 	"github.com/tendermint/tendermint/libs/protoio"
@@ -17,13 +16,6 @@ import (
 const (
 	nilVoteStr string = "nil-Vote"
 )
-
-type voter interface {
-	addVote(*Vote, peer.ID) (bool, error)
-
-	preCommits(int32) *VoteSet
-	preVotes(int32) *VoteSet
-}
 
 var (
 	ErrVoteUnexpectedStep            = errors.New("unexpected step")

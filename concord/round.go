@@ -17,10 +17,14 @@ type executor interface {
 }
 
 type Round interface {
-	executor
-	voter
 	// Propose takes a proposal block and gossips it through the network.
 	Propose(context.Context, Data)
+	execute(context.Context, pb.SignedMsgType)
+
+	addVote(*Vote, peer.ID) (bool, error)
+
+	preCommits(int32) *VoteSet
+	preVotes(int32) *VoteSet
 
 	addProposedBlock(*BlockID)
 	proposedBlock() *BlockID
