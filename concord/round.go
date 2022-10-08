@@ -3,6 +3,7 @@ package concord
 import (
 	"bytes"
 	"context"
+	"errors"
 
 	"github.com/libp2p/go-libp2p-core/peer"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
@@ -10,11 +11,6 @@ import (
 
 	"github.com/Wondertan/iotwal/concord/pb"
 )
-
-type executor interface {
-	// execute creates and publishes prevote and precommit votes
-	execute(context.Context, pb.SignedMsgType)
-}
 
 type Round interface {
 	// Propose takes a proposal block and gossips it through the network.
@@ -37,48 +33,55 @@ type valInfo struct {
 	valSelfPK crypto.PubKey
 }
 
-func newValinfo(set *ValidatorSet, valSelf PrivValidator, key crypto.PubKey) *valInfo {
-	return &valInfo{set, valSelf, key}
-}
-
 type round struct {
 	concordId      string
-	lastValidRound int64
 	topic          *pubsub.Topic
 	valInfo        *valInfo
 	proposalBlock  *BlockID
 	votes          *HeightVoteSet
+
+	round int32
+
+	waitProp chan []byte // marshalled Data
 }
 
-func newRound(concordId string, lastValidRound int64, topic *pubsub.Topic, info *valInfo) Round {
+func newRound(concordId string, topic *pubsub.Topic, info *valInfo) *round {
 	return &round{
-		concordId:      concordId,
-		lastValidRound: lastValidRound,
-		topic:          topic,
-		valInfo:        info,
-		votes:          NewHeightVoteSet(concordId, lastValidRound+1, info.valSet),
+		concordId: concordId,
+		topic: topic,
+		valInfo: info,
+		waitProp: make(chan []byte),
 	}
 }
 
-func (r *round) Propose(ctx context.Context, data Data) {
+// Propose takes a proposal block and gossipes it through the network.
+func (r *round) Propose(ctx context.Context, data Data) ([]byte, error) {
 	if r.isProposer() {
-		if err := r.propose(ctx, data); err != nil {
-			log.Errorw("during publishing", "err", err)
+		err := r.propose(ctx, data)
+		if err != nil {
+			return nil, err
 		}
+	}
+
+	select {
+	case prop := <-r.waitProp:
+		return prop, nil
+	case <-ctx.Done():
+		return nil, ctx.Err()
 	}
 }
 
 func (r *round) propose(ctx context.Context, data Data) error {
-	r.proposalBlock = &BlockID{Hash: data.Hash()}
-	prop := NewProposal(0, int32(r.lastValidRound+1), int32(r.lastValidRound), *r.proposalBlock)
+	bin, err := data.MarshalBinary()
+	if err != nil {
+		return err
+	}
+
+	prop := NewProposal(0, r.round, r.round, BlockID{}, bin)
 	pprop := prop.ToProto()
 
-	err := r.valInfo.valSelf.SignProposal(r.concordId, pprop)
+	err = r.valInfo.valSelf.SignProposal(r.concordId, pprop)
 	if err != nil {
-		log.Errorw("signing proposal",
-			"round", r.lastValidRound+1,
-			"err", err,
-		)
 		return err
 	}
 	prop.Signature = pprop.Signature
@@ -90,7 +93,7 @@ func (r *round) isProposer() bool {
 }
 
 func (r *round) execute(ctx context.Context, msgType pb.SignedMsgType) {
-	vote := NewVote(msgType, int32(r.lastValidRound+1), r.proposalBlock)
+	vote := NewVote(msgType, r.round, r.proposalBlock)
 	proto := vote.ToProto()
 	err := r.valInfo.valSelf.SignVote(r.concordId, proto)
 	if err != nil {
@@ -119,7 +122,7 @@ func (r *round) proposedBlock() *BlockID {
 }
 
 func (r *round) addVote(vote *Vote, p peer.ID) (bool, error) {
-	if vote.Height == r.lastValidRound && vote.Type == pb.PrecommitType {
+	if vote.Round == r.round && vote.Type == pb.PrecommitType {
 		log.Debug("received vote for the previous round")
 		return false, nil // TODO: make be return a specific error???
 	}
@@ -148,3 +151,39 @@ func (r *round) publish(ctx context.Context, message Message) error {
 
 	return r.topic.Publish(ctx, bin)
 }
+
+func (r *round) rcvVote(_ context.Context, v *Vote, from peer.ID) error {
+	_, err := r.votes.AddVote(v, from)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (r *round) rcvProposal(ctx context.Context, prop *Proposal) error {
+	if prop.Round != prop.Round {
+		return ErrProposalRound
+	}
+
+	// TODO Verify POLRound
+	proper := r.valInfo.valSet.GetProposer().PubKey
+	if !proper.VerifySignature(ProposalSignBytes(r.concordId, prop.ToProto()), prop.Signature) {
+		return ErrProposalSignature
+	}
+
+	select {
+	case r.waitProp <- prop.Data:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
+
+var (
+	ErrProposalSignature = errors.New("invalid proposal signature")
+	ErrProposalRound     = errors.New("invalid proposal round")
+	ErrAddingVote               = errors.New("adding vote")
+	ErrSignatureFoundInPastBlocks = errors.New("found signature from the same key")
+)

@@ -24,17 +24,20 @@ var (
 // If POLRound >= 0, then BlockID corresponds to the block that is locked in POLRound.
 type Proposal struct {
 	Type      pb.SignedMsgType
-	Height    int64     `json:"height"`
 	Round     int32     `json:"round"`     // there can not be greater than 2_147_483_647 rounds
 	POLRound  int32     `json:"pol_round"` // -1 if null.
-	BlockID   BlockID   `json:"block_id"`
 	Timestamp time.Time `json:"timestamp"`
 	Signature []byte    `json:"signature"`
+	Data      []byte    `json:"data"`
+
+	// TODO: TBRemoved
+	Height    int64     `json:"height"`
+	BlockID   BlockID   `json:"block_id"`
 }
 
 // NewProposal returns a new Proposal.
 // If there is no POLRound, polRound should be -1.
-func NewProposal(height int64, round int32, polRound int32, blockID BlockID) *Proposal {
+func NewProposal(height int64, round int32, polRound int32, blockID BlockID, data []byte) *Proposal {
 	return &Proposal{
 		Type:      pb.ProposalType,
 		Height:    height,
@@ -42,6 +45,7 @@ func NewProposal(height int64, round int32, polRound int32, blockID BlockID) *Pr
 		BlockID:   blockID,
 		POLRound:  polRound,
 		Timestamp: tmtime.Now(),
+		Data: 	   data,
 	}
 }
 

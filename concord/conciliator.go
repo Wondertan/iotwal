@@ -1,70 +1,120 @@
 package concord
 
 import (
-	"bytes"
 	"context"
+	"fmt"
+	"reflect"
 	"sync"
 
+	"github.com/Wondertan/iotwal/concord/pb"
+	"github.com/celestiaorg/go-libp2p-messenger/serde"
+	"github.com/libp2p/go-libp2p-core/peer"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
-	"github.com/tendermint/tendermint/crypto"
 )
+
+type ValidatorStore interface {
+	Get(context.Context, string) (*ValidatorSet, error)
+	Save(context.Context, string, *ValidatorSet) error
+}
+
+// TODD: Rename Validator to Proposer
+// TODO: Rename to just Validator
+type ProposalValidator func([]byte) bool
 
 type conciliator struct {
 	pubsub *pubsub.PubSub
+
+	valStore ValidatorStore
+	valSelf  PrivValidator
 }
 
 type concord struct {
-	concordId string
-	topic     *pubsub.Topic
+	id    string
+	topic *pubsub.Topic
 
-	valSet    *ValidatorSet
-	valSelf   PrivValidator
-	valSelfPK crypto.PubKey
+	roundMu sync.Mutex
+	round   *round
 
-	stateMu sync.Mutex
-	state   struct {
-		Height int64
-		Round  int32
-		Step   RoundStepType
-		// Last known round with POL for non-nil valid block.
-		ValidRound int32
+	validate ProposalValidator
+	valInfo  *valInfo
+}
+
+func (c *conciliator) newConcord(ctx context.Context, id string, pv ProposalValidator) (*concord, error) {
+	tpc, err := c.pubsub.Join(id)
+	if err != nil {
+		return nil, err
 	}
+
+	valSet, err := c.valStore.Get(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	pk, err := c.valSelf.GetPubKey()
+	if err != nil {
+		return nil, err
+	}
+
+	cord := &concord{
+		id:       id,
+		topic:    tpc,
+		validate: pv,
+		valInfo:  &valInfo{valSet, c.valSelf, pk},
+	}
+	return cord, c.pubsub.RegisterTopicValidator(id, cord.incoming)
 }
 
 func (c *concord) AgreeOn(ctx context.Context, data Data) (Data, error) {
-	c.stateMu.Lock()
-	defer c.stateMu.Unlock()
+	c.roundMu.Lock()
+	defer c.roundMu.Unlock()
+	c.round = newRound(c.id, c.topic, c.valInfo)
 
-	if c.isProposer() {
-		if err := c.propose(ctx, data); err != nil {
+	for ;;c.round.round++ {
+		prop, err := c.round.Propose(ctx, data)
+		if err != nil {
 			return nil, err
 		}
-	}
 
-	return data, nil
+		if c.validate(prop) {
+			continue
+		}
+
+		return data, nil
+	}
 }
 
-func (c *concord) propose(ctx context.Context, data Data) error {
-	height, round := c.state.Height, c.state.Round
-
-	prop := NewProposal(height, round, c.state.ValidRound, BlockID{Hash: data.Hash()})
-	pprop := prop.ToProto()
-
-	err := c.valSelf.SignProposal(c.concordId, pprop)
+func (c *concord) incoming(ctx context.Context, _ peer.ID, pmsg *pubsub.Message) pubsub.ValidationResult {
+	err := c.handle(ctx, pmsg)
 	if err != nil {
-		log.Errorw("signing proposal",
-			"height", height,
-			"round", round,
-			"err", err,
-		)
+		return pubsub.ValidationReject
+	}
+
+	return pubsub.ValidationAccept
+}
+
+func (c *concord) handle(ctx context.Context, pmsg *pubsub.Message) error {
+	tmsg := &pb.Message{}
+	_, err := serde.Unmarshal(tmsg, pmsg.Data)
+	if err != nil {
 		return err
 	}
-	prop.Signature = pprop.Signature
 
-	return nil
-}
+	msg, err := MsgFromProto(tmsg)
+	if err != nil {
+		return err
+	}
 
+	err = msg.ValidateBasic()
+	if err != nil {
+		return err
+	}
 
-func (c *concord) isProposer() bool {
-	return bytes.Equal(c.valSet.GetProposer().Address, c.valSelfPK.Address())
+	switch msg := msg.(type) {
+	case *ProposalMessage:
+		return c.round.rcvProposal(ctx, msg.Proposal)
+	case *VoteMessage:
+		return c.round.rcvVote(ctx, msg.Vote, peer.ID(pmsg.From))
+	default:
+		return fmt.Errorf("wrong msg type %v", reflect.TypeOf(msg))
+	}
 }
