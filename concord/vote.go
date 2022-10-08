@@ -60,7 +60,7 @@ type Vote struct {
 }
 
 func NewVote(t pb.SignedMsgType, round int32, blockID *BlockID) *Vote {
-	return &Vote{Type: pb.PrevoteType, Round: round, BlockID: *blockID, Timestamp: time.Now()}
+	return &Vote{Type: t, Round: round, BlockID: *blockID, Timestamp: time.Now()}
 }
 
 // CommitSig converts the Vote to a CommitSig.

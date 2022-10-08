@@ -27,7 +27,7 @@ type Round interface {
 }
 
 type propInfo struct {
-	set       *ProposerSet
+	set    *ProposerSet
 	self   PrivValidator
 	selfPK crypto.PubKey
 }
@@ -36,10 +36,9 @@ type round struct {
 	concordId      string
 	topic          *pubsub.Topic
 	valInfo        *propInfo
-	proposalBlock  *BlockID
-	votes          *HeightVoteSet
 
 	round int32
+	votes          *HeightVoteSet
 
 	waitProp chan []byte // marshalled Data
 }
@@ -76,7 +75,7 @@ func (r *round) propose(ctx context.Context, data Data) error {
 		return err
 	}
 
-	prop := NewProposal(0, r.round, r.round, BlockID{}, bin)
+	prop := NewProposal(r.round, r.round, bin)
 	pprop := prop.ToProto()
 
 	err = r.valInfo.self.SignProposal(r.concordId, pprop)
@@ -84,6 +83,7 @@ func (r *round) propose(ctx context.Context, data Data) error {
 		return err
 	}
 	prop.Signature = pprop.Signature
+
 	return r.publish(ctx, &ProposalMessage{Proposal: prop})
 }
 
@@ -91,33 +91,16 @@ func (r *round) isProposer() bool {
 	return bytes.Equal(r.valInfo.set.GetProposer().Address, r.valInfo.selfPK.Address())
 }
 
-func (r *round) execute(ctx context.Context, msgType pb.SignedMsgType) {
-	vote := NewVote(msgType, r.round, r.proposalBlock)
+func (r *round) execute(ctx context.Context, data Data, msgType pb.SignedMsgType) error {
+	vote := NewVote(msgType, r.round, &BlockID{Hash: data.Hash()})
 	proto := vote.ToProto()
 	err := r.valInfo.self.SignVote(r.concordId, proto)
 	if err != nil {
-		panic(err)
+		return err
 	}
-
 	vote.Signature = proto.Signature
-	if err = r.publish(ctx, &VoteMessage{Vote: vote}); err != nil {
-		log.Errorw("during publishing", "err", err, "msgType", msgType)
-	}
-}
 
-func (r *round) addProposedBlock(b *BlockID) {
-	if r.isProposer() {
-		// ensure that nobody changed chosen block
-		if bytes.Equal(b.Hash, r.proposalBlock.Hash) {
-			panic("invalid proposed block")
-		}
-		return
-	}
-	r.proposalBlock = b
-}
-
-func (r *round) proposedBlock() *BlockID {
-	return r.proposalBlock
+	return r.publish(ctx, &VoteMessage{Vote: vote})
 }
 
 func (r *round) addVote(vote *Vote, p peer.ID) (bool, error) {
@@ -178,7 +161,6 @@ func (r *round) rcvProposal(ctx context.Context, prop *Proposal) error {
 		return ctx.Err()
 	}
 }
-
 
 var (
 	ErrProposalSignature = errors.New("invalid proposal signature")
