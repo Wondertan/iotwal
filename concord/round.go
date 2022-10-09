@@ -31,13 +31,22 @@ type round struct {
 	maj23Dn map[pb.SignedMsgType]chan struct{}
 }
 
-func newRound(concordId string, topic *pubsub.Topic, info *propInfo) *round {
+func newRound(r int, concordId string, topic *pubsub.Topic, info *propInfo) *round {
 	return &round{
 		concordId: concordId,
 		topic:     topic,
 		valInfo:   info,
+		round: 		int32(r),
 		propCh:    make(chan []byte),
+		maj23Dn: map[pb.SignedMsgType]chan struct{}{
+			pb.PrevoteType: make(chan struct{}),
+			pb.PrecommitType: make(chan struct{}),
+		},
 	}
+}
+
+func (r *round) Round() int {
+	return int(r.round)
 }
 
 // Propose takes a proposal block and gossipes it through the network.

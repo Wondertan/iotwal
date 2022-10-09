@@ -32,12 +32,15 @@ type concord struct {
 	topic *pubsub.Topic
 
 	roundMu sync.Mutex
-	round   *round // FIXME: Race between AgreeOn and reads in handle
+	round   *round
 
 	validate Validator
 	propStore ProposerStore
 	self      PrivProposer
 	selfPK    crypto.PubKey
+
+	// allows only one AgreeOn call
+	agreeLk sync.Mutex
 }
 
 func (c *conciliator) newConcord(id string, pv Validator) (*concord, error) {
@@ -63,21 +66,30 @@ func (c *conciliator) newConcord(id string, pv Validator) (*concord, error) {
 	return cord, c.pubsub.RegisterTopicValidator(id, cord.incoming)
 }
 
+// TODO:
+//  * Handle case where we blocked on validation, but majority locked on the block.
+//    * Possible during catching up
+//  * Consider passing ProposerSet as a param
+//  * Implement vote for nil and timeouts
+//  * Introduce another 'session' entity identified by prop hash
+//    * Enables multiple independent agreements
+//    * Fixes potential catching up issues for layers above
 func (c *concord) AgreeOn(ctx context.Context, prop []byte) ([]byte, error) {
+	c.agreeLk.Lock()
+	defer c.agreeLk.Unlock()
+
 	// get a fresh proposer set
 	// we have to get fresh as they can change after each agreement
-	// TODO: Consider passing ProposerSet as a param
 	propSet, err := c.propStore.Get(ctx, c.id)
 	if err != nil {
 		return nil, err
 	}
 
-	c.roundMu.Lock()
-	defer c.roundMu.Unlock()
-	c.round = newRound(c.id, c.topic, &propInfo{propSet, c.self, c.selfPK})
+	for r := 0;; r++ {
+		c.roundMu.Lock()
+		c.round = newRound(r, c.id, c.topic, &propInfo{propSet, c.self, c.selfPK})
+		c.roundMu.Unlock()
 
-	// TODO: Vote Nil impl
-	for ;;c.round.round++ {
 		prop, err := c.round.Propose(ctx, prop)
 		if err != nil {
 			return nil, err
@@ -128,11 +140,19 @@ func (c *concord) handle(ctx context.Context, pmsg *pubsub.Message) error {
 		return err
 	}
 
+	c.roundMu.Lock()
+	round := c.round
+	c.roundMu.Unlock()
+	if msg.Round() != round.Round() {
+		// If we or peer lag behind - just skip for now
+		return nil // TODO: Validation Ignore
+	}
+
 	switch msg := msg.(type) {
 	case *ProposalMessage:
-		return c.round.rcvProposal(ctx, msg.Proposal)
+		return round.rcvProposal(ctx, msg.Proposal)
 	case *VoteMessage:
-		return c.round.rcvVote(ctx, msg.Vote, peer.ID(pmsg.From))
+		return round.rcvVote(ctx, msg.Vote, peer.ID(pmsg.From))
 	default:
 		return fmt.Errorf("wrong msg type %v", reflect.TypeOf(msg))
 	}
