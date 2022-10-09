@@ -85,10 +85,6 @@ func (r *round) isProposer() bool {
 }
 
 func (r *round) rcvProposal(ctx context.Context, prop *Proposal) error {
-	if prop.Round != prop.Round {
-		return ErrProposalRound
-	}
-
 	// TODO Verify POLRound
 	proper := r.valInfo.set.GetProposer().PubKey
 	if !proper.VerifySignature(ProposalSignBytes(r.concordId, prop.ToProto()), prop.Signature) {
