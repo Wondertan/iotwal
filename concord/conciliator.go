@@ -10,12 +10,12 @@ import (
 	"github.com/celestiaorg/go-libp2p-messenger/serde"
 	"github.com/libp2p/go-libp2p-core/peer"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
+	"github.com/tendermint/tendermint/crypto"
 	tmbytes "github.com/tendermint/tendermint/libs/bytes"
 )
 
 type ProposerStore interface {
 	Get(context.Context, string) (*ProposerSet, error)
-	Save(context.Context, string, *ProposerSet) error
 }
 
 type Validator func(context.Context, []byte) (tmbytes.HexBytes, error)
@@ -23,8 +23,8 @@ type Validator func(context.Context, []byte) (tmbytes.HexBytes, error)
 type conciliator struct {
 	pubsub *pubsub.PubSub
 
-	valStore ProposerStore
-	valSelf  PrivValidator
+	propStore ProposerStore
+	propSelf  PrivProposer
 }
 
 type concord struct {
@@ -35,21 +35,19 @@ type concord struct {
 	round   *round // FIXME: Race between AgreeOn and reads in handle
 
 	validate Validator
-	valInfo  *propInfo
+	propStore ProposerStore
+	self      PrivProposer
+	selfPK    crypto.PubKey
 }
 
-func (c *conciliator) newConcord(ctx context.Context, id string, pv Validator) (*concord, error) {
+func (c *conciliator) newConcord(id string, pv Validator) (*concord, error) {
+	// TODO: There should be at least one subscription
 	tpc, err := c.pubsub.Join(id)
 	if err != nil {
 		return nil, err
 	}
 
-	valSet, err := c.valStore.Get(ctx, id)
-	if err != nil {
-		return nil, err
-	}
-
-	pk, err := c.valSelf.GetPubKey()
+	pk, err := c.propSelf.GetPubKey()
 	if err != nil {
 		return nil, err
 	}
@@ -58,15 +56,25 @@ func (c *conciliator) newConcord(ctx context.Context, id string, pv Validator) (
 		id:       id,
 		topic:    tpc,
 		validate: pv,
-		valInfo:  &propInfo{valSet, c.valSelf, pk},
+		propStore: c.propStore,
+		self: c.propSelf,
+		selfPK: pk,
 	}
 	return cord, c.pubsub.RegisterTopicValidator(id, cord.incoming)
 }
 
 func (c *concord) AgreeOn(ctx context.Context, prop []byte) ([]byte, error) {
+	// get a fresh proposer set
+	// we have to get fresh as they can change after each agreement
+	// TODO: Consider passing ProposerSet as a param
+	propSet, err := c.propStore.Get(ctx, c.id)
+	if err != nil {
+		return nil, err
+	}
+
 	c.roundMu.Lock()
 	defer c.roundMu.Unlock()
-	c.round = newRound(c.id, c.topic, c.valInfo)
+	c.round = newRound(c.id, c.topic, &propInfo{propSet, c.self, c.selfPK})
 
 	for ;;c.round.round++ {
 		prop, err := c.round.Propose(ctx, prop)

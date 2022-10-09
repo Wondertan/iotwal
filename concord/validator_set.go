@@ -1025,10 +1025,10 @@ func ValidatorSetFromExistingValidators(valz []*Proposer) (*ProposerSet, error) 
 // where each validator has a voting power of +votingPower+.
 //
 // EXPOSED FOR TESTING.
-func RandValidatorSet(numValidators int, votingPower int64) (*ProposerSet, []PrivValidator) {
+func RandValidatorSet(numValidators int, votingPower int64) (*ProposerSet, []PrivProposer) {
 	var (
 		valz           = make([]*Proposer, numValidators)
-		privValidators = make([]PrivValidator, numValidators)
+		privValidators = make([]PrivProposer, numValidators)
 	)
 
 	for i := 0; i < numValidators; i++ {

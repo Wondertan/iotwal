@@ -15,7 +15,7 @@ import (
 
 type propInfo struct {
 	set    *ProposerSet
-	self   PrivValidator
+	self   PrivProposer
 	selfPK crypto.PubKey
 }
 

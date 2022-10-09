@@ -178,7 +178,7 @@ func ValidatorFromProto(vp *pb.Validator) (*Proposer, error) {
 
 // RandValidator returns a randomized validator, useful for testing.
 // UNSTABLE
-func RandValidator(randPower bool, minPower int64) (*Proposer, PrivValidator) {
+func RandValidator(randPower bool, minPower int64) (*Proposer, PrivProposer) {
 	privVal := NewMockPV()
 	votePower := minPower
 	if randPower {
