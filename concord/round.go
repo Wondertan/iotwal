@@ -8,23 +8,10 @@ import (
 	"github.com/libp2p/go-libp2p-core/peer"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/tendermint/tendermint/crypto"
+	tmbytes "github.com/tendermint/tendermint/libs/bytes"
 
 	"github.com/Wondertan/iotwal/concord/pb"
 )
-
-type Round interface {
-	// Propose takes a proposal block and gossips it through the network.
-	Propose(context.Context, Data)
-	execute(context.Context, pb.SignedMsgType)
-
-	addVote(*Vote, peer.ID) (bool, error)
-
-	preCommits() *VoteSet
-	preVotes() *VoteSet
-
-	addProposedBlock(*BlockID)
-	proposedBlock() *BlockID
-}
 
 type propInfo struct {
 	set    *ProposerSet
@@ -40,20 +27,23 @@ type round struct {
 	round int32
 	votes          *HeightVoteSet
 
-	waitProp chan []byte // marshalled Data
+	propCh chan []byte
+	voteCh chan *Vote
+	commCh chan *Vote
+
 }
 
 func newRound(concordId string, topic *pubsub.Topic, info *propInfo) *round {
 	return &round{
 		concordId: concordId,
-		topic: topic,
-		valInfo: info,
-		waitProp: make(chan []byte),
+		topic:     topic,
+		valInfo:   info,
+		propCh:    make(chan []byte),
 	}
 }
 
 // Propose takes a proposal block and gossipes it through the network.
-func (r *round) Propose(ctx context.Context, data Data) ([]byte, error) {
+func (r *round) Propose(ctx context.Context, data []byte) ([]byte, error) {
 	if r.isProposer() {
 		err := r.propose(ctx, data)
 		if err != nil {
@@ -62,23 +52,18 @@ func (r *round) Propose(ctx context.Context, data Data) ([]byte, error) {
 	}
 
 	select {
-	case prop := <-r.waitProp:
+	case prop := <-r.propCh:
 		return prop, nil
 	case <-ctx.Done():
 		return nil, ctx.Err()
 	}
 }
 
-func (r *round) propose(ctx context.Context, data Data) error {
-	bin, err := data.MarshalBinary()
-	if err != nil {
-		return err
-	}
-
-	prop := NewProposal(r.round, r.round, bin)
+func (r *round) propose(ctx context.Context, data []byte) error {
+	prop := NewProposal(r.round, r.round, data)
 	pprop := prop.ToProto()
 
-	err = r.valInfo.self.SignProposal(r.concordId, pprop)
+	err := r.valInfo.self.SignProposal(r.concordId, pprop)
 	if err != nil {
 		return err
 	}
@@ -91,8 +76,52 @@ func (r *round) isProposer() bool {
 	return bytes.Equal(r.valInfo.set.GetProposer().Address, r.valInfo.selfPK.Address())
 }
 
-func (r *round) execute(ctx context.Context, data Data, msgType pb.SignedMsgType) error {
-	vote := NewVote(msgType, r.round, &BlockID{Hash: data.Hash()})
+func (r *round) rcvProposal(ctx context.Context, prop *Proposal) error {
+	if prop.Round != prop.Round {
+		return ErrProposalRound
+	}
+
+	// TODO Verify POLRound
+	proper := r.valInfo.set.GetProposer().PubKey
+	if !proper.VerifySignature(ProposalSignBytes(r.concordId, prop.ToProto()), prop.Signature) {
+		return ErrProposalSignature
+	}
+
+	select {
+	case r.propCh <- prop.Data:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
+
+func (r *round) Vote(ctx context.Context, hash tmbytes.HexBytes) error {
+	err := r.execute(ctx, hash, pb.PrevoteType)
+	if err != nil {
+		return err
+	}
+
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
+func (r *round) PreCommit(ctx context.Context, hash tmbytes.HexBytes) error {
+	err := r.execute(ctx, hash, pb.PrecommitType)
+	if err != nil {
+		return err
+	}
+
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
+func (r *round) execute(ctx context.Context, hash tmbytes.HexBytes, msgType pb.SignedMsgType) error {
+	vote := NewVote(msgType, r.round, &BlockID{Hash: hash})
 	proto := vote.ToProto()
 	err := r.valInfo.self.SignVote(r.concordId, proto)
 	if err != nil {
@@ -112,12 +141,13 @@ func (r *round) addVote(vote *Vote, p peer.ID) (bool, error) {
 	return r.votes.AddVote(vote, p)
 }
 
-func (r *round) preVotes() *VoteSet {
-	return r.votes.Prevotes(0)
-}
+func (r *round) rcvVote(_ context.Context, v *Vote, from peer.ID) error {
+	_, err := r.votes.AddVote(v, from)
+	if err != nil {
+		return err
+	}
 
-func (r *round) preCommits() *VoteSet {
-	return r.votes.Precommits(0)
+	return nil
 }
 
 func (r *round) publish(ctx context.Context, message Message) error {
@@ -132,34 +162,6 @@ func (r *round) publish(ctx context.Context, message Message) error {
 	}
 
 	return r.topic.Publish(ctx, bin)
-}
-
-func (r *round) rcvVote(_ context.Context, v *Vote, from peer.ID) error {
-	_, err := r.votes.AddVote(v, from)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (r *round) rcvProposal(ctx context.Context, prop *Proposal) error {
-	if prop.Round != prop.Round {
-		return ErrProposalRound
-	}
-
-	// TODO Verify POLRound
-	proper := r.valInfo.set.GetProposer().PubKey
-	if !proper.VerifySignature(ProposalSignBytes(r.concordId, prop.ToProto()), prop.Signature) {
-		return ErrProposalSignature
-	}
-
-	select {
-	case r.waitProp <- prop.Data:
-		return nil
-	case <-ctx.Done():
-		return ctx.Err()
-	}
 }
 
 var (

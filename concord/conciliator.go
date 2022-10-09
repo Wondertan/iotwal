@@ -10,6 +10,7 @@ import (
 	"github.com/celestiaorg/go-libp2p-messenger/serde"
 	"github.com/libp2p/go-libp2p-core/peer"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
+	tmbytes "github.com/tendermint/tendermint/libs/bytes"
 )
 
 type ProposerStore interface {
@@ -17,7 +18,7 @@ type ProposerStore interface {
 	Save(context.Context, string, *ProposerSet) error
 }
 
-type Validator func([]byte) bool
+type Validator func(context.Context, []byte) (tmbytes.HexBytes, error)
 
 type conciliator struct {
 	pubsub *pubsub.PubSub
@@ -31,7 +32,7 @@ type concord struct {
 	topic *pubsub.Topic
 
 	roundMu sync.Mutex
-	round   *round
+	round   *round // FIXME: Race between AgreeOn and reads in handle
 
 	validate Validator
 	valInfo  *propInfo
@@ -62,22 +63,33 @@ func (c *conciliator) newConcord(ctx context.Context, id string, pv Validator) (
 	return cord, c.pubsub.RegisterTopicValidator(id, cord.incoming)
 }
 
-func (c *concord) AgreeOn(ctx context.Context, data Data) (Data, error) {
+func (c *concord) AgreeOn(ctx context.Context, prop []byte) ([]byte, error) {
 	c.roundMu.Lock()
 	defer c.roundMu.Unlock()
 	c.round = newRound(c.id, c.topic, c.valInfo)
 
 	for ;;c.round.round++ {
-		prop, err := c.round.Propose(ctx, data)
+		prop, err := c.round.Propose(ctx, prop)
 		if err != nil {
 			return nil, err
 		}
 
-		if c.validate(prop) {
-			continue
+		hash, err := c.validate(ctx, prop)
+		if err != nil {
+			return nil, err
 		}
 
-		return data, nil
+		err = c.round.Vote(ctx, hash)
+		if err != nil {
+			return nil, err
+		}
+		// TODO: Do we need to wait for all the votes or can we send PreCommits right after?
+		err = c.round.PreCommit(ctx, hash)
+		if err != nil {
+			return nil, err
+		}
+
+		return prop, nil
 	}
 }
 
