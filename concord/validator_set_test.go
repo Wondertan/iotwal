@@ -1507,7 +1507,7 @@ func TestValSetUpdateOverflowRelated(t *testing.T) {
 			valSet := createNewValidatorSet(tt.startVals)
 			verifyValidatorSet(t, valSet)
 
-			// execute update and verify returned error is as expected
+			// vote update and verify returned error is as expected
 			applyChangesToValSet(t, tt.expErr, valSet, tt.addedVals, tt.updatedVals, tt.deletedVals)
 
 			// verify updated validator set is as expected

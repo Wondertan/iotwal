@@ -25,12 +25,10 @@ type round struct {
 	valInfo        *propInfo
 
 	round int32
-	votes          *HeightVoteSet
+	votes          *HeightVoteSet // TODO: Instanitiate and reduce to VoteSets
 
-	propCh chan []byte
-	voteCh chan *Vote
-	commCh chan *Vote
-
+	propCh   chan []byte
+	maj23Dn map[pb.SignedMsgType]chan struct{}
 }
 
 func newRound(concordId string, topic *pubsub.Topic, info *propInfo) *round {
@@ -43,6 +41,7 @@ func newRound(concordId string, topic *pubsub.Topic, info *propInfo) *round {
 }
 
 // Propose takes a proposal block and gossipes it through the network.
+// TODO: Timeouts
 func (r *round) Propose(ctx context.Context, data []byte) ([]byte, error) {
 	if r.isProposer() {
 		err := r.propose(ctx, data)
@@ -95,32 +94,22 @@ func (r *round) rcvProposal(ctx context.Context, prop *Proposal) error {
 	}
 }
 
-
-func (r *round) Vote(ctx context.Context, hash tmbytes.HexBytes) error {
-	err := r.execute(ctx, hash, pb.PrevoteType)
+// TODO: Timeouts
+func (r *round) Vote(ctx context.Context, hash tmbytes.HexBytes, voteType pb.SignedMsgType) error {
+	err := r.vote(ctx, hash, voteType)
 	if err != nil {
 		return err
 	}
 
 	select {
+	case <-r.maj23Dn[voteType]:
+		return nil
 	case <-ctx.Done():
 		return ctx.Err()
 	}
 }
 
-func (r *round) PreCommit(ctx context.Context, hash tmbytes.HexBytes) error {
-	err := r.execute(ctx, hash, pb.PrecommitType)
-	if err != nil {
-		return err
-	}
-
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	}
-}
-
-func (r *round) execute(ctx context.Context, hash tmbytes.HexBytes, msgType pb.SignedMsgType) error {
+func (r *round) vote(ctx context.Context, hash tmbytes.HexBytes, msgType pb.SignedMsgType) error {
 	vote := NewVote(msgType, r.round, &BlockID{Hash: hash})
 	proto := vote.ToProto()
 	err := r.valInfo.self.SignVote(r.concordId, proto)
@@ -132,21 +121,20 @@ func (r *round) execute(ctx context.Context, hash tmbytes.HexBytes, msgType pb.S
 	return r.publish(ctx, &VoteMessage{Vote: vote})
 }
 
-func (r *round) addVote(vote *Vote, p peer.ID) (bool, error) {
-	if vote.Round == r.round && vote.Type == pb.PrecommitType {
-		log.Debug("received vote for the previous round")
-		return false, nil // TODO: make be return a specific error???
-	}
-
-	return r.votes.AddVote(vote, p)
-}
-
 func (r *round) rcvVote(_ context.Context, v *Vote, from peer.ID) error {
-	_, err := r.votes.AddVote(v, from)
-	if err != nil {
+	// adds the vote and does all the necessary verifications
+	ok, err := r.votes.AddVote(v, from)
+	if !ok || err != nil {
 		return err
 	}
 
+	set := r.votes.VoteSet(v.Round, v.Type)
+	if !set.HasTwoThirdsMajority() {
+		// need to wait more
+		return nil
+	}
+
+	close(r.maj23Dn[v.Type])
 	return nil
 }
 

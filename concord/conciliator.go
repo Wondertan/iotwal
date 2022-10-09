@@ -76,6 +76,7 @@ func (c *concord) AgreeOn(ctx context.Context, prop []byte) ([]byte, error) {
 	defer c.roundMu.Unlock()
 	c.round = newRound(c.id, c.topic, &propInfo{propSet, c.self, c.selfPK})
 
+	// TODO: Vote Nil impl
 	for ;;c.round.round++ {
 		prop, err := c.round.Propose(ctx, prop)
 		if err != nil {
@@ -87,12 +88,12 @@ func (c *concord) AgreeOn(ctx context.Context, prop []byte) ([]byte, error) {
 			return nil, err
 		}
 
-		err = c.round.Vote(ctx, hash)
+		err = c.round.Vote(ctx, hash, pb.PrevoteType)
 		if err != nil {
 			return nil, err
 		}
 		// TODO: Do we need to wait for all the votes or can we send PreCommits right after?
-		err = c.round.PreCommit(ctx, hash)
+		err = c.round.Vote(ctx, hash, pb.PrecommitType)
 		if err != nil {
 			return nil, err
 		}

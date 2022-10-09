@@ -121,11 +121,11 @@ func (hvs *HeightVoteSet) AddVote(vote *Vote, peerID peer.ID) (added bool, err e
 	if !IsVoteTypeValid(vote.Type) {
 		return
 	}
-	voteSet := hvs.getVoteSet(vote.Round, vote.Type)
+	voteSet := hvs.VoteSet(vote.Round, vote.Type)
 	if voteSet == nil {
 		if rndz := hvs.peerCatchupRounds[peerID]; len(rndz) < 2 {
 			hvs.addRound(vote.Round)
-			voteSet = hvs.getVoteSet(vote.Round, vote.Type)
+			voteSet = hvs.VoteSet(vote.Round, vote.Type)
 			hvs.peerCatchupRounds[peerID] = append(rndz, vote.Round)
 		} else {
 			// punish peer
@@ -137,25 +137,13 @@ func (hvs *HeightVoteSet) AddVote(vote *Vote, peerID peer.ID) (added bool, err e
 	return
 }
 
-func (hvs *HeightVoteSet) Prevotes(round int32) *VoteSet {
-	hvs.mtx.Lock()
-	defer hvs.mtx.Unlock()
-	return hvs.getVoteSet(round, pb.PrevoteType)
-}
-
-func (hvs *HeightVoteSet) Precommits(round int32) *VoteSet {
-	hvs.mtx.Lock()
-	defer hvs.mtx.Unlock()
-	return hvs.getVoteSet(round, pb.PrecommitType)
-}
-
 // POLInfo last round and blockID that has +2/3 prevotes for a particular block or nil.
 // Returns -1 if no such round exists.
 func (hvs *HeightVoteSet) POLInfo() (polRound int32, polBlockID BlockID) {
 	hvs.mtx.Lock()
 	defer hvs.mtx.Unlock()
 	for r := hvs.round; r >= 0; r-- {
-		rvs := hvs.getVoteSet(r, pb.PrevoteType)
+		rvs := hvs.VoteSet(r, pb.PrevoteType)
 		polBlockID, ok := rvs.TwoThirdsMajority()
 		if ok {
 			return r, polBlockID
@@ -164,7 +152,9 @@ func (hvs *HeightVoteSet) POLInfo() (polRound int32, polBlockID BlockID) {
 	return -1, BlockID{}
 }
 
-func (hvs *HeightVoteSet) getVoteSet(round int32, voteType pb.SignedMsgType) *VoteSet {
+func (hvs *HeightVoteSet) VoteSet(round int32, voteType pb.SignedMsgType) *VoteSet {
+	hvs.mtx.Lock()
+	defer hvs.mtx.Unlock()
 	rvs, ok := hvs.roundVoteSets[round]
 	if !ok {
 		return nil
@@ -193,7 +183,7 @@ func (hvs *HeightVoteSet) SetPeerMaj23(
 	if !IsVoteTypeValid(voteType) {
 		return fmt.Errorf("setPeerMaj23: Invalid vote type %X", voteType)
 	}
-	voteSet := hvs.getVoteSet(round, voteType)
+	voteSet := hvs.VoteSet(round, voteType)
 	if voteSet == nil {
 		return nil // something we don't know about yet
 	}
