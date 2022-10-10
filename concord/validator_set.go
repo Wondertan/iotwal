@@ -666,16 +666,12 @@ func (vals *ProposerSet) UpdateWithChangeSet(changes []*Proposer) error {
 // includes which validators signed. For instance, Gaia incentivizes proposers
 // with a bonus for including more than +2/3 of the signatures.
 func (vals *ProposerSet) VerifyCommit(chainID string, blockID BlockID,
-	height int64, commit *Commit) error {
+	commit *Commit) error {
 
 	if vals.Size() != len(commit.Signatures) {
 		return NewErrInvalidCommitSignatures(vals.Size(), len(commit.Signatures))
 	}
 
-	// Validate Height and BlockID.
-	if height != commit.Height {
-		return NewErrInvalidCommitHeight(height, commit.Height)
-	}
 	if !blockID.Equals(commit.BlockID) {
 		return fmt.Errorf("invalid commit -- wrong block ID: want %v, got %v",
 			blockID, commit.BlockID)
@@ -720,17 +716,12 @@ func (vals *ProposerSet) VerifyCommit(chainID string, blockID BlockID,
 //
 // This method is primarily used by the light client and does not check all the
 // signatures.
-func (vals *ProposerSet) VerifyCommitLight(chainID string, blockID BlockID,
-	height int64, commit *Commit) error {
+func (vals *ProposerSet) VerifyCommitLight(chainID string, blockID BlockID, commit *Commit) error {
 
 	if vals.Size() != len(commit.Signatures) {
 		return NewErrInvalidCommitSignatures(vals.Size(), len(commit.Signatures))
 	}
 
-	// Validate Height and BlockID.
-	if height != commit.Height {
-		return NewErrInvalidCommitHeight(height, commit.Height)
-	}
 	if !blockID.Equals(commit.BlockID) {
 		return fmt.Errorf("invalid commit -- wrong block ID: want %v, got %v",
 			blockID, commit.BlockID)

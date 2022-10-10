@@ -50,8 +50,6 @@ type Address = crypto.Address
 // consensus.
 type Vote struct {
 	Type             pb.SignedMsgType `json:"type"`
-	Height           int64            `json:"height"`
-	Round            int32            `json:"round"`    // assume there will not be greater than 2_147_483_647 rounds
 	BlockID          BlockID          `json:"block_id"` // zero if vote is nil.
 	Timestamp        time.Time        `json:"timestamp"`
 	ValidatorAddress Address          `json:"validator_address"`
@@ -60,7 +58,7 @@ type Vote struct {
 }
 
 func NewVote(t pb.SignedMsgType, round int32, blockID *BlockID) *Vote {
-	return &Vote{Type: t, Round: round, BlockID: *blockID, Timestamp: time.Now()}
+	return &Vote{Type: t, BlockID: *blockID, Timestamp: time.Now()}
 }
 
 // CommitSig converts the Vote to a CommitSig.
@@ -136,11 +134,9 @@ func (vote *Vote) String() string {
 		panic("Unknown vote type")
 	}
 
-	return fmt.Sprintf("Vote{%v:%X %v/%02d/%v(%v) %X %X @ %s}",
+	return fmt.Sprintf("Vote{%v:%X %v(%v) %X %X @ %s}",
 		vote.ValidatorIndex,
 		tmbytes.Fingerprint(vote.ValidatorAddress),
-		vote.Height,
-		vote.Round,
 		vote.Type,
 		typeString,
 		tmbytes.Fingerprint(vote.BlockID.Hash),
@@ -164,14 +160,6 @@ func (vote *Vote) Verify(chainID string, pubKey crypto.PubKey) error {
 func (vote *Vote) ValidateBasic() error {
 	if !IsVoteTypeValid(vote.Type) {
 		return errors.New("invalid Type")
-	}
-
-	if vote.Height < 0 {
-		return errors.New("negative Height")
-	}
-
-	if vote.Round < 0 {
-		return errors.New("negative Round")
 	}
 
 	// NOTE: Timestamp validation is subtle and handled elsewhere.
@@ -215,8 +203,6 @@ func (vote *Vote) ToProto() *pb.Vote {
 
 	return &pb.Vote{
 		Type:             vote.Type,
-		Height:           vote.Height,
-		Round:            vote.Round,
 		BlockID:          vote.BlockID.ToProto(),
 		Timestamp:        vote.Timestamp,
 		ValidatorAddress: vote.ValidatorAddress,
@@ -239,8 +225,6 @@ func VoteFromProto(pv *pb.Vote) (*Vote, error) {
 
 	vote := new(Vote)
 	vote.Type = pv.Type
-	vote.Height = pv.Height
-	vote.Round = pv.Round
 	vote.BlockID = *blockID
 	vote.Timestamp = pv.Timestamp
 	vote.ValidatorAddress = pv.ValidatorAddress

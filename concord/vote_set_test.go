@@ -7,10 +7,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/Wondertan/iotwal/concord/pb"
 	"github.com/tendermint/tendermint/crypto"
 	tmrand "github.com/tendermint/tendermint/libs/rand"
 	tmtime "github.com/tendermint/tendermint/types/time"
+
+	"github.com/Wondertan/iotwal/concord/pb"
 )
 
 func TestVoteSet_AddVote_Good(t *testing.T) {
@@ -30,8 +31,6 @@ func TestVoteSet_AddVote_Good(t *testing.T) {
 	vote := &Vote{
 		ValidatorAddress: val0Addr,
 		ValidatorIndex:   0, // since privValidators are in order
-		Height:           height,
-		Round:            round,
 		Type:             pb.PrevoteType,
 		Timestamp:        tmtime.Now(),
 		BlockID:          BlockID{nil},
@@ -52,8 +51,6 @@ func TestVoteSet_AddVote_Bad(t *testing.T) {
 	voteProto := &Vote{
 		ValidatorAddress: nil,
 		ValidatorIndex:   -1,
-		Height:           height,
-		Round:            round,
 		Timestamp:        tmtime.Now(),
 		Type:             pb.PrevoteType,
 		BlockID:          BlockID{nil},
@@ -89,7 +86,7 @@ func TestVoteSet_AddVote_Bad(t *testing.T) {
 		require.NoError(t, err)
 		addr := pubKey.Address()
 		vote := withValidator(voteProto, addr, 1)
-		added, err := signAddVote(privValidators[1], withHeight(vote, height+1), voteSet)
+		added, err := signAddVote(privValidators[1], vote, voteSet)
 		if added || err == nil {
 			t.Errorf("expected VoteSet.Add to fail, wrong height")
 		}
@@ -101,7 +98,7 @@ func TestVoteSet_AddVote_Bad(t *testing.T) {
 		require.NoError(t, err)
 		addr := pubKey.Address()
 		vote := withValidator(voteProto, addr, 2)
-		added, err := signAddVote(privValidators[2], withRound(vote, round+1), voteSet)
+		added, err := signAddVote(privValidators[2], vote, voteSet)
 		if added || err == nil {
 			t.Errorf("expected VoteSet.Add to fail, wrong round")
 		}
@@ -127,8 +124,6 @@ func TestVoteSet_2_3Majority(t *testing.T) {
 	voteProto := &Vote{
 		ValidatorAddress: nil, // NOTE: must fill in
 		ValidatorIndex:   -1,  // NOTE: must fill in
-		Height:           height,
-		Round:            round,
 		Type:             pb.PrevoteType,
 		Timestamp:        tmtime.Now(),
 		BlockID:          BlockID{nil},
@@ -179,8 +174,6 @@ func TestVoteSet_2_3MajorityRedux(t *testing.T) {
 	voteProto := &Vote{
 		ValidatorAddress: nil, // NOTE: must fill in
 		ValidatorIndex:   -1,  // NOTE: must fill in
-		Height:           height,
-		Round:            round,
 		Timestamp:        tmtime.Now(),
 		Type:             pb.PrevoteType,
 		BlockID:          BlockID{blockHash},
@@ -248,8 +241,6 @@ func TestVoteSet_Conflicts(t *testing.T) {
 	voteProto := &Vote{
 		ValidatorAddress: nil,
 		ValidatorIndex:   -1,
-		Height:           height,
-		Round:            round,
 		Timestamp:        tmtime.Now(),
 		Type:             pb.PrevoteType,
 		BlockID:          BlockID{nil},
@@ -376,8 +367,6 @@ func TestVoteSet_MakeCommit(t *testing.T) {
 	voteProto := &Vote{
 		ValidatorAddress: nil,
 		ValidatorIndex:   -1,
-		Height:           height,
-		Round:            round,
 		Timestamp:        tmtime.Now(),
 		Type:             pb.PrecommitType,
 		BlockID:          BlockID{blockHash},
@@ -453,7 +442,7 @@ func randVoteSet(
 	votingPower int64,
 ) (*VoteSet, *ProposerSet, []PrivProposer) {
 	valSet, privValidators := RandValidatorSet(numValidators, votingPower)
-	return NewVoteSet("test_chain_id", height, round, signedMsgType, valSet), valSet, privValidators
+	return NewVoteSet("test_chain_id", signedMsgType, valSet), valSet, privValidators
 }
 
 // Convenience: Return new vote with different validator address/index
@@ -461,20 +450,6 @@ func withValidator(vote *Vote, addr []byte, idx int32) *Vote {
 	vote = vote.Copy()
 	vote.ValidatorAddress = addr
 	vote.ValidatorIndex = idx
-	return vote
-}
-
-// Convenience: Return new vote with different height
-func withHeight(vote *Vote, height int64) *Vote {
-	vote = vote.Copy()
-	vote.Height = height
-	return vote
-}
-
-// Convenience: Return new vote with different round
-func withRound(vote *Vote, round int32) *Vote {
-	vote = vote.Copy()
-	vote.Round = round
 	return vote
 }
 

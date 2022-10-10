@@ -7,14 +7,15 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/Wondertan/iotwal/concord/pb"
 	"github.com/tendermint/tendermint/libs/bits"
 	tmrand "github.com/tendermint/tendermint/libs/rand"
+
+	"github.com/Wondertan/iotwal/concord/pb"
 )
 
 func TestMsgToProto(t *testing.T) {
 	bi := BlockID{
-		Hash:          tmrand.Bytes(32),
+		Hash: tmrand.Bytes(32),
 	}
 	pbBi := bi.ToProto()
 	bits := bits.NewBitArray(1)
@@ -22,10 +23,8 @@ func TestMsgToProto(t *testing.T) {
 
 	proposal := Proposal{
 		Type:      pb.ProposalType,
-		Height:    1,
 		Round:     1,
 		POLRound:  1,
-		BlockID:   bi,
 		Timestamp: time.Now(),
 		Signature: tmrand.Bytes(20),
 	}
@@ -67,19 +66,19 @@ func TestMsgToProto(t *testing.T) {
 		}, false},
 
 		{"successful NewValidBlockMessage", &NewValidBlockMessage{
-			Height:             1,
-			Round:              1,
+			Height: 1,
+			Round:  1,
 			// BlockPartSetHeader: psh,
 			// BlockParts:         bits,
-			IsCommit:           false,
+			IsCommit: false,
 		}, &pb.Message{
 			Sum: &pb.Message_NewValidBlock{
 				NewValidBlock: &pb.NewValidBlock{
-					Height:             1,
-					Round:              1,
+					Height: 1,
+					Round:  1,
 					// BlockPartSetHeader: pbPsh,
 					// BlockParts:         pbBits,
-					IsCommit:           false,
+					IsCommit: false,
 				},
 			},
 		}, false},

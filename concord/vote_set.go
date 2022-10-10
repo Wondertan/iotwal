@@ -5,10 +5,12 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/Wondertan/iotwal/concord/pb"
+	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/tendermint/tendermint/libs/bits"
 	tmjson "github.com/tendermint/tendermint/libs/json"
 	tmsync "github.com/tendermint/tendermint/libs/sync"
+
+	"github.com/Wondertan/iotwal/concord/pb"
 )
 
 const (
@@ -18,50 +20,42 @@ const (
 	MaxVotesCount = 10000
 )
 
-// UNSTABLE
-// XXX: duplicate of p2p.ID to avoid dependence between packages.
-// Perhaps we can have a minimal types package containing this (and other things?)
-// that both `types` and `p2p` import ?
-type P2PID string
-
 /*
-	VoteSet helps collect signatures from validators at each height+round for a
-	predefined vote type.
+VoteSet helps collect signatures from validators at each height+round for a
+predefined vote type.
 
-	We need VoteSet to be able to keep track of conflicting votes when validators
-	double-sign.  Yet, we can't keep track of *all* the votes seen, as that could
-	be a DoS attack vector.
+We need VoteSet to be able to keep track of conflicting votes when validators
+double-sign.  Yet, we can't keep track of *all* the votes seen, as that could
+be a DoS attack vector.
 
-	There are two storage areas for votes.
-	1. voteSet.votes
-	2. voteSet.votesByBlock
+There are two storage areas for votes.
+1. voteSet.votes
+2. voteSet.votesByBlock
 
-	`.votes` is the "canonical" list of votes.  It always has at least one vote,
-	if a vote from a validator had been seen at all.  Usually it keeps track of
-	the first vote seen, but when a 2/3 majority is found, votes for that get
-	priority and are copied over from `.votesByBlock`.
+`.votes` is the "canonical" list of votes.  It always has at least one vote,
+if a vote from a validator had been seen at all.  Usually it keeps track of
+the first vote seen, but when a 2/3 majority is found, votes for that get
+priority and are copied over from `.votesByBlock`.
 
-	`.votesByBlock` keeps track of a list of votes for a particular block.  There
-	are two ways a &blockVotes{} gets created in `.votesByBlock`.
-	1. the first vote seen by a validator was for the particular block.
-	2. a peer claims to have seen 2/3 majority for the particular block.
+`.votesByBlock` keeps track of a list of votes for a particular block.  There
+are two ways a &blockVotes{} gets created in `.votesByBlock`.
+1. the first vote seen by a validator was for the particular block.
+2. a peer claims to have seen 2/3 majority for the particular block.
 
-	Since the first vote from a validator will always get added in `.votesByBlock`
-	, all votes in `.votes` will have a corresponding entry in `.votesByBlock`.
+Since the first vote from a validator will always get added in `.votesByBlock`
+, all votes in `.votes` will have a corresponding entry in `.votesByBlock`.
 
-	When a &blockVotes{} in `.votesByBlock` reaches a 2/3 majority quorum, its
-	votes are copied into `.votes`.
+When a &blockVotes{} in `.votesByBlock` reaches a 2/3 majority quorum, its
+votes are copied into `.votes`.
 
-	All this is memory bounded because conflicting votes only get added if a peer
-	told us to track that block, each peer only gets to tell us 1 such block, and,
-	there's only a limited number of peers.
+All this is memory bounded because conflicting votes only get added if a peer
+told us to track that block, each peer only gets to tell us 1 such block, and,
+there's only a limited number of peers.
 
-	NOTE: Assumes that the sum total of voting power does not exceed MaxUInt64.
+NOTE: Assumes that the sum total of voting power does not exceed MaxUInt64.
 */
 type VoteSet struct {
 	chainID       string
-	height        int64
-	round         int32
 	signedMsgType pb.SignedMsgType
 	valSet        *ProposerSet
 
@@ -71,19 +65,14 @@ type VoteSet struct {
 	sum           int64                  // Sum of voting power for seen votes, discounting conflicts
 	maj23         *BlockID               // First 2/3 majority seen
 	votesByBlock  map[string]*blockVotes // string(blockHash|blockParts) -> blockVotes
-	peerMaj23s    map[P2PID]BlockID      // Maj23 for each peer
+	peerMaj23s    map[peer.ID]BlockID    // Maj23 for each peer
 }
 
 // Constructs a new VoteSet struct used to accumulate votes for given height/round.
-func NewVoteSet(chainID string, height int64, round int32,
+func NewVoteSet(chainID string,
 	signedMsgType pb.SignedMsgType, valSet *ProposerSet) *VoteSet {
-	if height == 0 {
-		panic("Cannot make VoteSet for height == 0, doesn't make sense.")
-	}
 	return &VoteSet{
 		chainID:       chainID,
-		height:        height,
-		round:         round,
 		signedMsgType: signedMsgType,
 		valSet:        valSet,
 		votesBitArray: bits.NewBitArray(valSet.Size()),
@@ -91,28 +80,12 @@ func NewVoteSet(chainID string, height int64, round int32,
 		sum:           0,
 		maj23:         nil,
 		votesByBlock:  make(map[string]*blockVotes, valSet.Size()),
-		peerMaj23s:    make(map[P2PID]BlockID),
+		peerMaj23s:    make(map[peer.ID]BlockID),
 	}
 }
 
 func (voteSet *VoteSet) ChainID() string {
 	return voteSet.chainID
-}
-
-// Implements VoteSetReader.
-func (voteSet *VoteSet) GetHeight() int64 {
-	if voteSet == nil {
-		return 0
-	}
-	return voteSet.height
-}
-
-// Implements VoteSetReader.
-func (voteSet *VoteSet) GetRound() int32 {
-	if voteSet == nil {
-		return -1
-	}
-	return voteSet.round
 }
 
 // Implements VoteSetReader.
@@ -133,8 +106,10 @@ func (voteSet *VoteSet) Size() int {
 
 // Returns added=true if vote is valid and new.
 // Otherwise returns err=ErrVote[
-//		UnexpectedStep | InvalidIndex | InvalidAddress |
-//		InvalidSignature | InvalidBlockHash | ConflictingVotes ]
+//
+//	UnexpectedStep | InvalidIndex | InvalidAddress |
+//	InvalidSignature | InvalidBlockHash | ConflictingVotes ]
+//
 // Duplicate votes return added=false, err=nil.
 // Conflicting votes return added=*, err=ErrVoteConflictingVotes.
 // NOTE: vote should not be mutated after adding.
@@ -167,12 +142,9 @@ func (voteSet *VoteSet) addVote(vote *Vote) (added bool, err error) {
 	}
 
 	// Make sure the step matches.
-	if (vote.Height != voteSet.height) ||
-		(vote.Round != voteSet.round) ||
-		(vote.Type != voteSet.signedMsgType) {
-		return false, fmt.Errorf("expected %d/%d/%d, but got %d/%d/%d: %w",
-			voteSet.height, voteSet.round, voteSet.signedMsgType,
-			vote.Height, vote.Round, vote.Type, ErrVoteUnexpectedStep)
+	if vote.Type != voteSet.signedMsgType {
+		return false, fmt.Errorf("expected %d, but got %d: %w", voteSet.signedMsgType,
+			vote.Type, ErrVoteUnexpectedStep)
 	}
 
 	// Ensure that signer is a validator.
@@ -306,7 +278,8 @@ func (voteSet *VoteSet) addVerifiedVote(
 // this can cause memory issues.
 // TODO: implement ability to remove peers too
 // NOTE: VoteSet must not be nil
-func (voteSet *VoteSet) SetPeerMaj23(peerID P2PID, blockID BlockID) error {
+// TODO: may be remove this??
+func (voteSet *VoteSet) SetPeerMaj23(peerID peer.ID, blockID BlockID) error {
 	if voteSet == nil {
 		panic("SetPeerMaj23() on nil VoteSet")
 	}
@@ -492,12 +465,12 @@ func (voteSet *VoteSet) StringIndented(indent string) string {
 		}
 	}
 	return fmt.Sprintf(`VoteSet{
-%s  H:%v R:%v T:%v
+%s T:%v
 %s  %v
 %s  %v
 %s  %v
 %s}`,
-		indent, voteSet.height, voteSet.round, voteSet.signedMsgType,
+		indent, voteSet.signedMsgType,
 		indent, strings.Join(voteStrings, "\n"+indent+"  "),
 		indent, voteSet.votesBitArray,
 		indent, voteSet.peerMaj23s,
@@ -520,9 +493,9 @@ func (voteSet *VoteSet) MarshalJSON() ([]byte, error) {
 // NOTE: insufficient for unmarshalling from (compressed votes)
 // TODO: make the peerMaj23s nicer to read (eg just the block hash)
 type VoteSetJSON struct {
-	Votes         []string          `json:"votes"`
-	VotesBitArray string            `json:"votes_bit_array"`
-	PeerMaj23s    map[P2PID]BlockID `json:"peer_maj_23s"`
+	Votes         []string            `json:"votes"`
+	VotesBitArray string              `json:"votes_bit_array"`
+	PeerMaj23s    map[peer.ID]BlockID `json:"peer_maj_23s"`
 }
 
 // Return the bit-array of votes including
@@ -575,8 +548,8 @@ func (voteSet *VoteSet) StringShort() string {
 	voteSet.mtx.Lock()
 	defer voteSet.mtx.Unlock()
 	_, _, frac := voteSet.sumTotalFrac()
-	return fmt.Sprintf(`VoteSet{H:%v R:%v T:%v +2/3:%v(%v) %v %v}`,
-		voteSet.height, voteSet.round, voteSet.signedMsgType, voteSet.maj23, frac, voteSet.votesBitArray, voteSet.peerMaj23s)
+	return fmt.Sprintf(`VoteSet{T:%v +2/3:%v(%v) %v %v}`,
+		voteSet.signedMsgType, voteSet.maj23, frac, voteSet.votesBitArray, voteSet.peerMaj23s)
 }
 
 // LogString produces a logging suitable string representation of the
@@ -630,16 +603,16 @@ func (voteSet *VoteSet) MakeCommit() *Commit {
 		commitSigs[i] = commitSig
 	}
 
-	return NewCommit(voteSet.GetHeight(), voteSet.GetRound(), *voteSet.maj23, commitSigs)
+	return NewCommit(*voteSet.maj23, commitSigs)
 }
 
 //--------------------------------------------------------------------------------
 
 /*
-	Votes for a particular block
-	There are two ways a *blockVotes gets created for a blockKey.
-	1. first (non-conflicting) vote of a validator w/ blockKey (peerMaj23=false)
-	2. A peer claims to have a 2/3 majority w/ blockKey (peerMaj23=true)
+Votes for a particular block
+There are two ways a *blockVotes gets created for a blockKey.
+1. first (non-conflicting) vote of a validator w/ blockKey (peerMaj23=false)
+2. A peer claims to have a 2/3 majority w/ blockKey (peerMaj23=true)
 */
 type blockVotes struct {
 	peerMaj23 bool           // peer claims to have maj23
@@ -677,8 +650,6 @@ func (vs *blockVotes) getByIndex(index int32) *Vote {
 
 // Common interface between *consensus.VoteSet and types.Commit
 type VoteSetReader interface {
-	GetHeight() int64
-	GetRound() int32
 	Type() byte
 	Size() int
 	BitArray() *bits.BitArray

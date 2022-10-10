@@ -4,9 +4,10 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/Wondertan/iotwal/concord/pb"
 	"github.com/gogo/protobuf/proto"
 	"github.com/tendermint/tendermint/libs/bits"
+
+	"github.com/Wondertan/iotwal/concord/pb"
 )
 
 //-----------------------------------------------------------------------------
@@ -14,10 +15,8 @@ import (
 
 // Message is a message that can be sent and received on the Reactor
 type Message interface {
-	Round() int
 	ValidateBasic() error
 }
-
 
 func decodeMsg(bz []byte) (msg Message, err error) {
 	pb := &pb.Message{}
@@ -93,10 +92,10 @@ func (m *NewRoundStepMessage) String() string {
 // i.e., there is a Proposal for block B and 2/3+ prevotes for the block B in the round r.
 // In case the block is also committed, then IsCommit flag is set to true.
 type NewValidBlockMessage struct {
-	Height             int64
-	Round              int32
+	Height int64
+	Round  int32
 	// TODO: BlockParts removed, requires some sort of ID
-	IsCommit           bool
+	IsCommit bool
 }
 
 // ValidateBasic performs basic validation.
@@ -168,7 +167,6 @@ func (m *ProposalPOLMessage) String() string {
 	return fmt.Sprintf("[ProposalPOL H:%v POLR:%v POL:%v]", m.Height, m.ProposalPOLRound, m.ProposalPOL)
 }
 
-
 // VoteMessage is sent when voting for a proposal (or lack thereof).
 type VoteMessage struct {
 	Vote *Vote
@@ -177,10 +175,6 @@ type VoteMessage struct {
 // ValidateBasic performs basic validation.
 func (m *VoteMessage) ValidateBasic() error {
 	return m.Vote.ValidateBasic()
-}
-
-func (m *VoteMessage) Round() int {
-	return int(m.Vote.Round)
 }
 
 // String returns a string representation.

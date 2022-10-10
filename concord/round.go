@@ -20,14 +20,14 @@ type propInfo struct {
 }
 
 type round struct {
-	concordId      string
-	topic          *pubsub.Topic
-	valInfo        *propInfo
+	concordId string
+	topic     *pubsub.Topic
+	valInfo   *propInfo
 
 	round int32
-	votes          *HeightVoteSet // TODO: Instanitiate and reduce to VoteSets
+	votes *HeightVoteSet // TODO: Instanitiate and reduce to VoteSets
 
-	propCh   chan []byte
+	propCh  chan []byte
 	maj23Dn map[pb.SignedMsgType]chan struct{}
 }
 
@@ -36,10 +36,10 @@ func newRound(r int, concordId string, topic *pubsub.Topic, info *propInfo) *rou
 		concordId: concordId,
 		topic:     topic,
 		valInfo:   info,
-		round: 		int32(r),
+		round:     int32(r),
 		propCh:    make(chan []byte),
 		maj23Dn: map[pb.SignedMsgType]chan struct{}{
-			pb.PrevoteType: make(chan struct{}),
+			pb.PrevoteType:   make(chan struct{}),
 			pb.PrecommitType: make(chan struct{}),
 		},
 	}
@@ -128,12 +128,12 @@ func (r *round) vote(ctx context.Context, hash tmbytes.HexBytes, msgType pb.Sign
 
 func (r *round) rcvVote(_ context.Context, v *Vote, from peer.ID) error {
 	// adds the vote and does all the necessary verifications
-	ok, err := r.votes.AddVote(v, from)
+	ok, err := r.votes.AddVote(v)
 	if !ok || err != nil {
 		return err
 	}
 
-	set := r.votes.VoteSet(v.Round, v.Type)
+	set := r.votes.VoteSet(v.Type)
 	if !set.HasTwoThirdsMajority() {
 		// need to wait more
 		return nil
@@ -158,8 +158,8 @@ func (r *round) publish(ctx context.Context, message Message) error {
 }
 
 var (
-	ErrProposalSignature = errors.New("invalid proposal signature")
-	ErrProposalRound     = errors.New("invalid proposal round")
-	ErrAddingVote               = errors.New("adding vote")
+	ErrProposalSignature          = errors.New("invalid proposal signature")
+	ErrProposalRound              = errors.New("invalid proposal round")
+	ErrAddingVote                 = errors.New("adding vote")
 	ErrSignatureFoundInPastBlocks = errors.New("found signature from the same key")
 )

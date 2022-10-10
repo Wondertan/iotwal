@@ -6,13 +6,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Wondertan/iotwal/concord/pb"
 	"github.com/tendermint/tendermint/crypto"
 	"github.com/tendermint/tendermint/crypto/ed25519"
 	"github.com/tendermint/tendermint/crypto/merkle"
 	"github.com/tendermint/tendermint/libs/bits"
 	tmbytes "github.com/tendermint/tendermint/libs/bytes"
 	tmmath "github.com/tendermint/tendermint/libs/math"
+
+	"github.com/Wondertan/iotwal/concord/pb"
 )
 
 var (
@@ -22,7 +23,6 @@ var (
 	MaxSignatureSize = tmmath.MaxInt(ed25519.SignatureSize, 64)
 )
 
-
 // Commit contains the evidence that a block was committed by a set of validators.
 // NOTE: Commit is empty for height 1, but never nil.
 type Commit struct {
@@ -30,8 +30,6 @@ type Commit struct {
 	// ProposerSet order.
 	// Any peer with a block can gossip signatures by index with a peer without
 	// recalculating the active ProposerSet.
-	Height     int64       `json:"height"`
-	Round      int32       `json:"round"`
 	BlockID    BlockID     `json:"block_id"`
 	Signatures []CommitSig `json:"signatures"`
 
@@ -43,10 +41,8 @@ type Commit struct {
 }
 
 // NewCommit returns a new Commit.
-func NewCommit(height int64, round int32, blockID BlockID, commitSigs []CommitSig) *Commit {
+func NewCommit(blockID BlockID, commitSigs []CommitSig) *Commit {
 	return &Commit{
-		Height:     height,
-		Round:      round,
 		BlockID:    blockID,
 		Signatures: commitSigs,
 	}
@@ -56,7 +52,7 @@ func NewCommit(height int64, round int32, blockID BlockID, commitSigs []CommitSi
 // Panics if signatures from the commit can't be added to the voteset.
 // Inverse of VoteSet.MakeCommit().
 func CommitToVoteSet(chainID string, commit *Commit, vals *ProposerSet) *VoteSet {
-	voteSet := NewVoteSet(chainID, commit.Height, commit.Round, pb.PrecommitType, vals)
+	voteSet := NewVoteSet(chainID, pb.PrecommitType, vals)
 	for idx, commitSig := range commit.Signatures {
 		if commitSig.Absent() {
 			continue // OK, some precommits can be missing.
@@ -76,8 +72,6 @@ func (commit *Commit) GetVote(valIdx int32) *Vote {
 	commitSig := commit.Signatures[valIdx]
 	return &Vote{
 		Type:             pb.PrecommitType,
-		Height:           commit.Height,
-		Round:            commit.Round,
 		BlockID:          commitSig.BlockID(commit.BlockID),
 		Timestamp:        commitSig.Timestamp,
 		ValidatorAddress: commitSig.ValidatorAddress,
@@ -104,18 +98,6 @@ func (commit *Commit) VoteSignBytes(chainID string, valIdx int32) []byte {
 // Implements VoteSetReader.
 func (commit *Commit) Type() byte {
 	return byte(pb.PrecommitType)
-}
-
-// GetHeight returns height of the commit.
-// Implements VoteSetReader.
-func (commit *Commit) GetHeight() int64 {
-	return commit.Height
-}
-
-// GetRound returns height of the commit.
-// Implements VoteSetReader.
-func (commit *Commit) GetRound() int32 {
-	return commit.Round
 }
 
 // Size returns the number of signatures in the commit.
@@ -157,25 +139,16 @@ func (commit *Commit) IsCommit() bool {
 // ValidateBasic performs basic validation that doesn't involve state data.
 // Does not actually check the cryptographic signatures.
 func (commit *Commit) ValidateBasic() error {
-	if commit.Height < 0 {
-		return errors.New("negative Height")
-	}
-	if commit.Round < 0 {
-		return errors.New("negative Round")
+	if commit.BlockID.IsZero() {
+		return errors.New("commit cannot be for nil block")
 	}
 
-	if commit.Height >= 1 {
-		if commit.BlockID.IsZero() {
-			return errors.New("commit cannot be for nil block")
-		}
-
-		if len(commit.Signatures) == 0 {
-			return errors.New("no signatures in commit")
-		}
-		for i, commitSig := range commit.Signatures {
-			if err := commitSig.ValidateBasic(); err != nil {
-				return fmt.Errorf("wrong CommitSig #%d: %v", i, err)
-			}
+	if len(commit.Signatures) == 0 {
+		return errors.New("no signatures in commit")
+	}
+	for i, commitSig := range commit.Signatures {
+		if err := commitSig.ValidateBasic(); err != nil {
+			return fmt.Errorf("wrong CommitSig #%d: %v", i, err)
 		}
 	}
 	return nil
@@ -212,14 +185,10 @@ func (commit *Commit) StringIndented(indent string) string {
 		commitSigStrings[i] = commitSig.String()
 	}
 	return fmt.Sprintf(`Commit{
-%s  Height:     %d
-%s  Round:      %d
 %s  BlockID:    %v
 %s  Signatures:
 %s    %v
 %s}#%v`,
-		indent, commit.Height,
-		indent, commit.Round,
 		indent, commit.BlockID,
 		indent,
 		indent, strings.Join(commitSigStrings, "\n"+indent+"    "),
@@ -238,9 +207,6 @@ func (commit *Commit) ToProto() *pb.Commit {
 		sigs[i] = *commit.Signatures[i].ToProto()
 	}
 	c.Signatures = sigs
-
-	c.Height = commit.Height
-	c.Round = commit.Round
 	c.BlockID = commit.BlockID.ToProto()
 
 	return c
@@ -270,13 +236,10 @@ func CommitFromProto(cp *pb.Commit) (*Commit, error) {
 	}
 	commit.Signatures = sigs
 
-	commit.Height = cp.Height
-	commit.Round = cp.Round
 	commit.BlockID = *bi
 
 	return commit, commit.ValidateBasic()
 }
-
 
 // BlockIDFlag indicates which BlockID the signature is for.
 type BlockIDFlag byte
