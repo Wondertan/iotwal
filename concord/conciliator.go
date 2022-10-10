@@ -6,12 +6,13 @@ import (
 	"reflect"
 	"sync"
 
-	"github.com/Wondertan/iotwal/concord/pb"
 	"github.com/celestiaorg/go-libp2p-messenger/serde"
 	"github.com/libp2p/go-libp2p-core/peer"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/tendermint/tendermint/crypto"
 	tmbytes "github.com/tendermint/tendermint/libs/bytes"
+
+	"github.com/Wondertan/iotwal/concord/pb"
 )
 
 type ProposerStore interface {
@@ -34,7 +35,7 @@ type concord struct {
 	roundMu sync.Mutex
 	round   *round
 
-	validate Validator
+	validate  Validator
 	propStore ProposerStore
 	self      PrivProposer
 	selfPK    crypto.PubKey
@@ -56,24 +57,24 @@ func (c *conciliator) newConcord(id string, pv Validator) (*concord, error) {
 	}
 
 	cord := &concord{
-		id:       id,
-		topic:    tpc,
-		validate: pv,
+		id:        id,
+		topic:     tpc,
+		validate:  pv,
 		propStore: c.propStore,
-		self: c.propSelf,
-		selfPK: pk,
+		self:      c.propSelf,
+		selfPK:    pk,
 	}
 	return cord, c.pubsub.RegisterTopicValidator(id, cord.incoming)
 }
 
 // TODO:
-//  * Handle case where we blocked on validation, but majority locked on the block.
-//    * Possible during catching up
-//  * Consider passing ProposerSet as a param
-//  * Implement vote for nil and timeouts
-//  * Introduce another 'session' entity identified by prop hash
-//    * Enables multiple independent agreements
-//    * Fixes potential catching up issues for layers above
+//   - Handle case where we blocked on validation, but majority locked on the block.
+//   - Possible during catching up
+//   - Consider passing ProposerSet as a param
+//   - Implement vote for nil and timeouts
+//   - Introduce another 'session' entity identified by prop hash
+//   - Enables multiple independent agreements
+//   - Fixes potential catching up issues for layers above
 func (c *concord) AgreeOn(ctx context.Context, prop []byte) ([]byte, error) {
 	c.agreeLk.Lock()
 	defer c.agreeLk.Unlock()
@@ -85,33 +86,32 @@ func (c *concord) AgreeOn(ctx context.Context, prop []byte) ([]byte, error) {
 		return nil, err
 	}
 
-	for r := 0;; r++ {
-		c.roundMu.Lock()
-		c.round = newRound(r, c.id, c.topic, &propInfo{propSet, c.self, c.selfPK})
-		c.roundMu.Unlock()
+	c.roundMu.Lock()
+	c.round = newRound(0, c.id, c.topic, &propInfo{propSet, c.self, c.selfPK})
+	c.roundMu.Unlock()
 
-		prop, err := c.round.Propose(ctx, prop)
-		if err != nil {
-			return nil, err
-		}
-
-		hash, err := c.validate(ctx, prop)
-		if err != nil {
-			return nil, err
-		}
-
-		err = c.round.Vote(ctx, hash, pb.PrevoteType)
-		if err != nil {
-			return nil, err
-		}
-		// TODO: Do we need to wait for all the votes or can we send PreCommits right after?
-		err = c.round.Vote(ctx, hash, pb.PrecommitType)
-		if err != nil {
-			return nil, err
-		}
-
-		return prop, nil
+	prop, err = c.round.Propose(ctx, prop)
+	if err != nil {
+		return nil, err
 	}
+
+	hash, err := c.validate(ctx, prop)
+	if err != nil {
+		return nil, err
+	}
+
+	err = c.round.Vote(ctx, hash, pb.PrevoteType)
+	if err != nil {
+		return nil, err
+	}
+	// TODO: Do we need to wait for all the votes or can we send PreCommits right after?
+	err = c.round.Vote(ctx, hash, pb.PrecommitType)
+	if err != nil {
+		return nil, err
+	}
+
+	return prop, nil
+
 }
 
 func (c *concord) incoming(ctx context.Context, _ peer.ID, pmsg *pubsub.Message) pubsub.ValidationResult {

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ProjectModuleManager">
+    <modules>
+      <module fileurl="file://$PROJECT_DIR$/.idea/iotwal.iml" filepath="$PROJECT_DIR$/.idea/iotwal.iml" />
+      <module fileurl="file://$PROJECT_DIR$/../../../vgonkivs/tendermint/.idea/tendermint.iml" filepath="$PROJECT_DIR$/../../../vgonkivs/tendermint/.idea/tendermint.iml" />
+    </modules>
+  </component>
+</project>
