@@ -75,7 +75,7 @@ func (c *conciliator) newConcord(id string, pv Validator) (*concord, error) {
 //   - Introduce another 'session' entity identified by prop hash
 //   - Enables multiple independent agreements
 //   - Fixes potential catching up issues for layers above
-func (c *concord) AgreeOn(ctx context.Context, prop []byte) ([]byte, error) {
+func (c *concord) AgreeOn(ctx context.Context, prop []byte) ([]byte, *Commit, error) {
 	c.agreeLk.Lock()
 	defer c.agreeLk.Unlock()
 
@@ -83,7 +83,7 @@ func (c *concord) AgreeOn(ctx context.Context, prop []byte) ([]byte, error) {
 	// we have to get fresh as they can change after each agreement
 	propSet, err := c.propStore.Get(ctx, c.id)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	c.roundMu.Lock()
@@ -92,26 +92,26 @@ func (c *concord) AgreeOn(ctx context.Context, prop []byte) ([]byte, error) {
 
 	prop, err = c.round.Propose(ctx, prop)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	hash, err := c.validate(ctx, prop)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	err = c.round.Vote(ctx, hash, pb.PrevoteType)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	// TODO: Do we need to wait for all the votes or can we send PreCommits right after?
 	err = c.round.Vote(ctx, hash, pb.PrecommitType)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	return prop, nil
-
+	votes := c.round.votes(pb.PrecommitType)
+	return prop, votes.MakeCommit(), nil
 }
 
 func (c *concord) incoming(ctx context.Context, _ peer.ID, pmsg *pubsub.Message) pubsub.ValidationResult {

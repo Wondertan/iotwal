@@ -24,8 +24,8 @@ type round struct {
 	topic     *pubsub.Topic
 	valInfo   *propInfo
 
-	round int32
-	votes *HeightVoteSet // TODO: Instanitiate and reduce to VoteSets
+	round   int32
+	voteSet *HeightVoteSet // TODO: Instanitiate and reduce to VoteSets
 
 	propCh  chan []byte
 	maj23Dn map[pb.SignedMsgType]chan struct{}
@@ -124,12 +124,12 @@ func (r *round) vote(ctx context.Context, hash tmbytes.HexBytes, msgType pb.Sign
 
 func (r *round) rcvVote(_ context.Context, v *Vote, from peer.ID) error {
 	// adds the vote and does all the necessary verifications
-	ok, err := r.votes.AddVote(v)
+	ok, err := r.voteSet.AddVote(v)
 	if !ok || err != nil {
 		return err
 	}
 
-	set := r.votes.VoteSet(v.Type)
+	set := r.voteSet.VoteSet(v.Type)
 	if !set.HasTwoThirdsMajority() {
 		// need to wait more
 		return nil
@@ -137,6 +137,10 @@ func (r *round) rcvVote(_ context.Context, v *Vote, from peer.ID) error {
 
 	close(r.maj23Dn[v.Type])
 	return nil
+}
+
+func (r *round) votes(msgType pb.SignedMsgType) *VoteSet {
+	return r.voteSet.VoteSet(msgType)
 }
 
 func (r *round) publish(ctx context.Context, message Message) error {
