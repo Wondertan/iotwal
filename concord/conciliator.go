@@ -143,10 +143,6 @@ func (c *concord) handle(ctx context.Context, pmsg *pubsub.Message) error {
 	c.roundMu.Lock()
 	round := c.round
 	c.roundMu.Unlock()
-	if msg.Round() != round.Round() {
-		// If we or peer lag behind - just skip for now
-		return nil // TODO: Validation Ignore
-	}
 
 	switch msg := msg.(type) {
 	case *ProposalMessage:

@@ -45,10 +45,6 @@ func newRound(r int, concordId string, topic *pubsub.Topic, info *propInfo) *rou
 	}
 }
 
-func (r *round) Round() int {
-	return int(r.round)
-}
-
 // Propose takes a proposal block and gossipes it through the network.
 // TODO: Timeouts
 func (r *round) Propose(ctx context.Context, data []byte) ([]byte, error) {

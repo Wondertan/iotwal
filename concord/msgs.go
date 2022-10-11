@@ -122,10 +122,6 @@ type ProposalMessage struct {
 	Proposal *Proposal
 }
 
-func (m *ProposalMessage) Round() int {
-	return int(m.Proposal.Round)
-}
-
 // ValidateBasic performs basic validation.
 func (m *ProposalMessage) ValidateBasic() error {
 	return m.Proposal.ValidateBasic()
