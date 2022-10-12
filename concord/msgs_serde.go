@@ -6,9 +6,10 @@ import (
 
 	"github.com/gogo/protobuf/proto"
 
-	cpb "github.com/Wondertan/iotwal/concord/pb"
 	"github.com/tendermint/tendermint/libs/bits"
 	tmmath "github.com/tendermint/tendermint/libs/math"
+
+	cpb "github.com/Wondertan/iotwal/concord/pb"
 )
 
 // MsgToProto takes a consensus message type and returns the proto defined consensus message
@@ -37,9 +38,9 @@ func MsgToProto(msg Message) (*cpb.Message, error) {
 		pb = cpb.Message{
 			Sum: &cpb.Message_NewValidBlock{
 				NewValidBlock: &cpb.NewValidBlock{
-					Height:             msg.Height,
-					Round:              msg.Round,
-					IsCommit:           msg.IsCommit,
+					Height:   msg.Height,
+					Round:    msg.Round,
+					IsCommit: msg.IsCommit,
 				},
 			},
 		}
@@ -80,27 +81,27 @@ func MsgToProto(msg Message) (*cpb.Message, error) {
 			},
 		}
 	case *VoteSetMaj23Message:
-		bi := msg.BlockID.ToProto()
+		bi := msg.DataHash.ToProto()
 		pb = cpb.Message{
 			Sum: &cpb.Message_VoteSetMaj23{
 				VoteSetMaj23: &cpb.VoteSetMaj23{
-					Height:  msg.Height,
-					Round:   msg.Round,
-					Type:    msg.Type,
-					BlockID: bi,
+					Height:   msg.Height,
+					Round:    msg.Round,
+					Type:     msg.Type,
+					DataHash: *bi,
 				},
 			},
 		}
 	case *VoteSetBitsMessage:
-		bi := msg.BlockID.ToProto()
+		bi := msg.DataHash.ToProto()
 		bits := msg.Votes.ToProto()
 
 		vsb := &cpb.Message_VoteSetBits{
 			VoteSetBits: &cpb.VoteSetBits{
-				Height:  msg.Height,
-				Round:   msg.Round,
-				Type:    msg.Type,
-				BlockID: bi,
+				Height:   msg.Height,
+				Round:    msg.Round,
+				Type:     msg.Type,
+				DataHash: *bi,
 			},
 		}
 
@@ -145,9 +146,9 @@ func MsgFromProto(msg *cpb.Message) (Message, error) {
 		pbBits.FromProto(msg.NewValidBlock.BlockParts)
 
 		pb = &NewValidBlockMessage{
-			Height:             msg.NewValidBlock.Height,
-			Round:              msg.NewValidBlock.Round,
-			IsCommit:           msg.NewValidBlock.IsCommit,
+			Height:   msg.NewValidBlock.Height,
+			Round:    msg.NewValidBlock.Round,
+			IsCommit: msg.NewValidBlock.IsCommit,
 		}
 	case *cpb.Message_Proposal:
 		pbP, err := ProposalFromProto(msg.Proposal)
@@ -183,18 +184,18 @@ func MsgFromProto(msg *cpb.Message) (Message, error) {
 			Index:  msg.HasVote.Index,
 		}
 	case *cpb.Message_VoteSetMaj23:
-		bi, err := BlockIDFromProto(&msg.VoteSetMaj23.BlockID)
+		bi, err := DataHashFromProto(&msg.VoteSetMaj23.DataHash)
 		if err != nil {
 			return nil, fmt.Errorf("voteSetMaj23 msg to proto error: %w", err)
 		}
 		pb = &VoteSetMaj23Message{
-			Height:  msg.VoteSetMaj23.Height,
-			Round:   msg.VoteSetMaj23.Round,
-			Type:    msg.VoteSetMaj23.Type,
-			BlockID: *bi,
+			Height:   msg.VoteSetMaj23.Height,
+			Round:    msg.VoteSetMaj23.Round,
+			Type:     msg.VoteSetMaj23.Type,
+			DataHash: *bi,
 		}
 	case *cpb.Message_VoteSetBits:
-		bi, err := BlockIDFromProto(&msg.VoteSetBits.BlockID)
+		bi, err := DataHashFromProto(&msg.VoteSetBits.DataHash)
 		if err != nil {
 			return nil, fmt.Errorf("voteSetBits msg to proto error: %w", err)
 		}
@@ -202,11 +203,11 @@ func MsgFromProto(msg *cpb.Message) (Message, error) {
 		bits.FromProto(&msg.VoteSetBits.Votes)
 
 		pb = &VoteSetBitsMessage{
-			Height:  msg.VoteSetBits.Height,
-			Round:   msg.VoteSetBits.Round,
-			Type:    msg.VoteSetBits.Type,
-			BlockID: *bi,
-			Votes:   bits,
+			Height:   msg.VoteSetBits.Height,
+			Round:    msg.VoteSetBits.Round,
+			Type:     msg.VoteSetBits.Type,
+			DataHash: *bi,
+			Votes:    bits,
 		}
 	default:
 		return nil, fmt.Errorf("consensus: message not recognized: %T", msg)

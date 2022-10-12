@@ -69,7 +69,7 @@ func makeVoteHR(t *testing.T, height int64, valIndex, round int32, privVals []Pr
 		ValidatorIndex:   valIndex,
 		Timestamp:        tmtime.Now(),
 		Type:             pb.PrecommitType,
-		BlockID:          BlockID{Hash: randBytes},
+		DataHash:         DataHash{Hash: randBytes},
 	}
 	chainID := config.ChainID()
 

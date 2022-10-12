@@ -27,7 +27,7 @@ type round struct {
 	round   int32
 	voteSet *HeightVoteSet // TODO: Instanitiate and reduce to VoteSets
 
-	propCh  chan []byte
+	propCh  chan DataHash
 	maj23Dn map[pb.SignedMsgType]chan struct{}
 }
 
@@ -37,7 +37,7 @@ func newRound(r int, concordId string, topic *pubsub.Topic, info *propInfo) *rou
 		topic:     topic,
 		valInfo:   info,
 		round:     int32(r),
-		propCh:    make(chan []byte),
+		propCh:    make(chan DataHash),
 		maj23Dn: map[pb.SignedMsgType]chan struct{}{
 			pb.PrevoteType:   make(chan struct{}),
 			pb.PrecommitType: make(chan struct{}),
@@ -57,7 +57,7 @@ func (r *round) Propose(ctx context.Context, data []byte) ([]byte, error) {
 
 	select {
 	case prop := <-r.propCh:
-		return prop, nil
+		return prop.Hash, nil
 	case <-ctx.Done():
 		return nil, ctx.Err()
 	}
@@ -111,7 +111,7 @@ func (r *round) Vote(ctx context.Context, hash tmbytes.HexBytes, voteType pb.Sig
 }
 
 func (r *round) vote(ctx context.Context, hash tmbytes.HexBytes, msgType pb.SignedMsgType) error {
-	vote := NewVote(msgType, r.round, &BlockID{Hash: hash})
+	vote := NewVote(msgType, r.round, &DataHash{Hash: hash})
 	proto := vote.ToProto()
 	err := r.valInfo.self.SignVote(r.concordId, proto)
 	if err != nil {

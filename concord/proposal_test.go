@@ -25,9 +25,7 @@ func init() {
 		panic(err)
 	}
 	testProposal = &Proposal{
-		Height: 12345,
-		Round:  23456,
-		BlockID: BlockID{Hash: []byte("--June_15_2020_amino_was_removed")},
+		Data:      DataHash{Hash: []byte("--June_15_2020_amino_was_removed")},
 		POLRound:  -1,
 		Timestamp: stamp,
 	}
@@ -59,8 +57,8 @@ func TestProposalVerifySignature(t *testing.T) {
 	require.NoError(t, err)
 
 	prop := NewProposal(
-		4, 2, 2,
-		BlockID{tmrand.Bytes(tmhash.Size)})
+		2, 2,
+		tmrand.Bytes(tmhash.Size))
 	p := prop.ToProto()
 	signBytes := ProposalSignBytes("test_chain_id", p)
 
@@ -131,11 +129,10 @@ func TestProposalValidateBasic(t *testing.T) {
 	}{
 		{"Good Proposal", func(p *Proposal) {}, false},
 		{"Invalid Type", func(p *Proposal) { p.Type = pb.PrecommitType }, true},
-		{"Invalid Height", func(p *Proposal) { p.Height = -1 }, true},
 		{"Invalid Round", func(p *Proposal) { p.Round = -1 }, true},
 		{"Invalid POLRound", func(p *Proposal) { p.POLRound = -2 }, true},
-		{"Invalid BlockId", func(p *Proposal) {
-			p.BlockID = BlockID{[]byte{1, 2, 3}}
+		{"Invalid DataHash", func(p *Proposal) {
+			p.Data = DataHash{[]byte{1, 2, 3}}
 		}, true},
 		{"Invalid Signature", func(p *Proposal) {
 			p.Signature = make([]byte, 0)
@@ -144,14 +141,14 @@ func TestProposalValidateBasic(t *testing.T) {
 			p.Signature = make([]byte, MaxSignatureSize+1)
 		}, true},
 	}
-	blockID := makeBlockID(tmhash.Sum([]byte("blockhash")), tmhash.Sum([]byte("partshash")))
+	dataHash := makeDataHash(tmhash.Sum([]byte("blockhash")), tmhash.Sum([]byte("partshash")))
 
 	for _, tc := range testCases {
 		tc := tc
 		t.Run(tc.testName, func(t *testing.T) {
 			prop := NewProposal(
-				4, 2, 2,
-				blockID)
+				4, 2,
+				dataHash.Hash)
 			p := prop.ToProto()
 			err := privVal.SignProposal("test_chain_id", p)
 			prop.Signature = p.Signature
@@ -163,9 +160,9 @@ func TestProposalValidateBasic(t *testing.T) {
 }
 
 func TestProposalProtoBuf(t *testing.T) {
-	proposal := NewProposal(1, 2, 3, makeBlockID([]byte("hash"), []byte("part_set_hash")))
+	proposal := NewProposal(1, 2, makeDataHash([]byte("hash"), []byte("part_set_hash")).Hash)
 	proposal.Signature = []byte("sig")
-	proposal2 := NewProposal(1, 2, 3, BlockID{})
+	proposal2 := NewProposal(1, 2, nil)
 
 	testCases := []struct {
 		msg     string

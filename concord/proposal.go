@@ -28,7 +28,7 @@ type Proposal struct {
 	POLRound  int32     `json:"pol_round"` // -1 if null.
 	Timestamp time.Time `json:"timestamp"`
 	Signature []byte    `json:"signature"`
-	Data      []byte    `json:"data"`
+	Data      DataHash  `json:"data"`
 }
 
 // NewProposal returns a new Proposal.
@@ -39,7 +39,7 @@ func NewProposal(round int32, polRound int32, data []byte) *Proposal {
 		Round:     round,
 		POLRound:  polRound,
 		Timestamp: tmtime.Now(),
-		Data: 	   data,
+		Data:      DataHash{data},
 	}
 }
 
@@ -113,7 +113,7 @@ func (p *Proposal) ToProto() *pb.Proposal {
 	pb.Type = p.Type
 	pb.Round = p.Round
 	pb.PolRound = p.POLRound
-	pb.Data = p.Data
+	pb.DataHash = p.Data.ToProto()
 	pb.Timestamp = p.Timestamp
 	pb.Signature = p.Signature
 
@@ -132,7 +132,7 @@ func ProposalFromProto(pp *pb.Proposal) (*Proposal, error) {
 	p.Type = pp.Type
 	p.Round = pp.Round
 	p.POLRound = pp.PolRound
-	p.Data = pp.Data
+	p.Data = DataHash{pp.DataHash.Hash}
 	p.Timestamp = pp.Timestamp
 	p.Signature = pp.Signature
 

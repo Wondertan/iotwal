@@ -63,9 +63,9 @@ type VoteSet struct {
 	votesBitArray *bits.BitArray
 	votes         []*Vote                // Primary votes to share
 	sum           int64                  // Sum of voting power for seen votes, discounting conflicts
-	maj23         *BlockID               // First 2/3 majority seen
+	maj23         *DataHash              // First 2/3 majority seen
 	votesByBlock  map[string]*blockVotes // string(blockHash|blockParts) -> blockVotes
-	peerMaj23s    map[peer.ID]BlockID    // Maj23 for each peer
+	peerMaj23s    map[peer.ID]DataHash   // Maj23 for each peer
 }
 
 // Constructs a new VoteSet struct used to accumulate votes for given height/round.
@@ -80,7 +80,7 @@ func NewVoteSet(chainID string,
 		sum:           0,
 		maj23:         nil,
 		votesByBlock:  make(map[string]*blockVotes, valSet.Size()),
-		peerMaj23s:    make(map[peer.ID]BlockID),
+		peerMaj23s:    make(map[peer.ID]DataHash),
 	}
 }
 
@@ -132,7 +132,7 @@ func (voteSet *VoteSet) addVote(vote *Vote) (added bool, err error) {
 	}
 	valIndex := vote.ValidatorIndex
 	valAddr := vote.ValidatorAddress
-	blockKey := vote.BlockID.Key()
+	blockKey := vote.DataHash.Key()
 
 	// Ensure that validator index was set
 	if valIndex < 0 {
@@ -189,7 +189,7 @@ func (voteSet *VoteSet) addVote(vote *Vote) (added bool, err error) {
 
 // Returns (vote, true) if vote exists for valIndex and blockKey.
 func (voteSet *VoteSet) getVote(valIndex int32, blockKey string) (vote *Vote, ok bool) {
-	if existing := voteSet.votes[valIndex]; existing != nil && existing.BlockID.Key() == blockKey {
+	if existing := voteSet.votes[valIndex]; existing != nil && existing.DataHash.Key() == blockKey {
 		return existing, true
 	}
 	if existing := voteSet.votesByBlock[blockKey].getByIndex(valIndex); existing != nil {
@@ -209,7 +209,7 @@ func (voteSet *VoteSet) addVerifiedVote(
 
 	// Already exists in voteSet.votes?
 	if existing := voteSet.votes[valIndex]; existing != nil {
-		if existing.BlockID.Equals(vote.BlockID) {
+		if existing.DataHash.Equals(vote.DataHash) {
 			panic("addVerifiedVote does not expect duplicate votes")
 		} else {
 			conflicting = existing
@@ -259,7 +259,7 @@ func (voteSet *VoteSet) addVerifiedVote(
 	if origSum < quorum && quorum <= votesByBlock.sum {
 		// Only consider the first quorum reached
 		if voteSet.maj23 == nil {
-			maj23BlockID := vote.BlockID
+			maj23BlockID := vote.DataHash
 			voteSet.maj23 = &maj23BlockID
 			// And also copy votes over to voteSet.votes
 			for i, vote := range votesByBlock.votes {
@@ -279,7 +279,7 @@ func (voteSet *VoteSet) addVerifiedVote(
 // TODO: implement ability to remove peers too
 // NOTE: VoteSet must not be nil
 // TODO: may be remove this??
-func (voteSet *VoteSet) SetPeerMaj23(peerID peer.ID, blockID BlockID) error {
+func (voteSet *VoteSet) SetPeerMaj23(peerID peer.ID, blockID DataHash) error {
 	if voteSet == nil {
 		panic("SetPeerMaj23() on nil VoteSet")
 	}
@@ -324,7 +324,7 @@ func (voteSet *VoteSet) BitArray() *bits.BitArray {
 	return voteSet.votesBitArray.Copy()
 }
 
-func (voteSet *VoteSet) BitArrayByBlockID(blockID BlockID) *bits.BitArray {
+func (voteSet *VoteSet) BitArrayByBlockID(blockID DataHash) *bits.BitArray {
 	if voteSet == nil {
 		return nil
 	}
@@ -417,16 +417,16 @@ func (voteSet *VoteSet) HasAll() bool {
 
 // If there was a +2/3 majority for blockID, return blockID and true.
 // Else, return the empty BlockID{} and false.
-func (voteSet *VoteSet) TwoThirdsMajority() (blockID BlockID, ok bool) {
+func (voteSet *VoteSet) TwoThirdsMajority() (blockID DataHash, ok bool) {
 	if voteSet == nil {
-		return BlockID{}, false
+		return DataHash{}, false
 	}
 	voteSet.mtx.Lock()
 	defer voteSet.mtx.Unlock()
 	if voteSet.maj23 != nil {
 		return *voteSet.maj23, true
 	}
-	return BlockID{}, false
+	return DataHash{}, false
 }
 
 //--------------------------------------------------------------------------------
@@ -493,9 +493,9 @@ func (voteSet *VoteSet) MarshalJSON() ([]byte, error) {
 // NOTE: insufficient for unmarshalling from (compressed votes)
 // TODO: make the peerMaj23s nicer to read (eg just the block hash)
 type VoteSetJSON struct {
-	Votes         []string            `json:"votes"`
-	VotesBitArray string              `json:"votes_bit_array"`
-	PeerMaj23s    map[peer.ID]BlockID `json:"peer_maj_23s"`
+	Votes         []string             `json:"votes"`
+	VotesBitArray string               `json:"votes_bit_array"`
+	PeerMaj23s    map[peer.ID]DataHash `json:"peer_maj_23s"`
 }
 
 // Return the bit-array of votes including
@@ -597,7 +597,7 @@ func (voteSet *VoteSet) MakeCommit() *Commit {
 	for i, v := range voteSet.votes {
 		commitSig := v.CommitSig()
 		// if block ID exists but doesn't match, exclude sig
-		if commitSig.ForBlock() && !v.BlockID.Equals(*voteSet.maj23) {
+		if commitSig.ForBlock() && !v.DataHash.Equals(*voteSet.maj23) {
 			commitSig = NewCommitSigAbsent()
 		}
 		commitSigs[i] = commitSig

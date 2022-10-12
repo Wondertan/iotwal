@@ -665,16 +665,16 @@ func (vals *ProposerSet) UpdateWithChangeSet(changes []*Proposer) error {
 // application that depends on the LastCommitInfo sent in BeginBlock, which
 // includes which validators signed. For instance, Gaia incentivizes proposers
 // with a bonus for including more than +2/3 of the signatures.
-func (vals *ProposerSet) VerifyCommit(chainID string, blockID BlockID,
+func (vals *ProposerSet) VerifyCommit(chainID string, blockID DataHash,
 	commit *Commit) error {
 
 	if vals.Size() != len(commit.Signatures) {
 		return NewErrInvalidCommitSignatures(vals.Size(), len(commit.Signatures))
 	}
 
-	if !blockID.Equals(commit.BlockID) {
+	if !blockID.Equals(commit.DataHash) {
 		return fmt.Errorf("invalid commit -- wrong block ID: want %v, got %v",
-			blockID, commit.BlockID)
+			blockID, commit.DataHash)
 	}
 
 	talliedVotingPower := int64(0)
@@ -716,15 +716,15 @@ func (vals *ProposerSet) VerifyCommit(chainID string, blockID BlockID,
 //
 // This method is primarily used by the light client and does not check all the
 // signatures.
-func (vals *ProposerSet) VerifyCommitLight(chainID string, blockID BlockID, commit *Commit) error {
+func (vals *ProposerSet) VerifyCommitLight(chainID string, blockID DataHash, commit *Commit) error {
 
 	if vals.Size() != len(commit.Signatures) {
 		return NewErrInvalidCommitSignatures(vals.Size(), len(commit.Signatures))
 	}
 
-	if !blockID.Equals(commit.BlockID) {
+	if !blockID.Equals(commit.DataHash) {
 		return fmt.Errorf("invalid commit -- wrong block ID: want %v, got %v",
-			blockID, commit.BlockID)
+			blockID, commit.DataHash)
 	}
 
 	talliedVotingPower := int64(0)

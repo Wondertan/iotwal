@@ -685,7 +685,7 @@ func TestValidatorSet_VerifyCommit_All(t *testing.T) {
 	require.NoError(t, err)
 	vote.Signature = sig
 
-	commit := NewCommit(vote.BlockID, []CommitSig{vote.CommitSig()})
+	commit := NewCommit(vote.DataHash, []CommitSig{vote.CommitSig()})
 
 	vote2 := *vote
 	sig2, err := privKey.Sign(VoteSignBytes("EpsilonEridani", v))
@@ -695,28 +695,28 @@ func TestValidatorSet_VerifyCommit_All(t *testing.T) {
 	testCases := []struct {
 		description string
 		chainID     string
-		blockID     BlockID
+		blockID     DataHash
 		commit      *Commit
 		expErr      bool
 	}{
-		{"good", chainID, vote.BlockID, commit, false},
+		{"good", chainID, vote.DataHash, commit, false},
 
-		{"wrong signature (#0)", "EpsilonEridani", vote.BlockID, commit, true},
-		{"wrong block ID", chainID, makeBlockIDRandom(), commit, true},
-		{"wrong height", chainID, vote.BlockID, commit, true},
+		{"wrong signature (#0)", "EpsilonEridani", vote.DataHash, commit, true},
+		{"wrong block ID", chainID, makeDataHashRandom(), commit, true},
+		{"wrong height", chainID, vote.DataHash, commit, true},
 
-		{"wrong set size: 1 vs 0", chainID, vote.BlockID,
-			NewCommit(vote.BlockID, []CommitSig{}), true},
+		{"wrong set size: 1 vs 0", chainID, vote.DataHash,
+			NewCommit(vote.DataHash, []CommitSig{}), true},
 
-		{"wrong set size: 1 vs 2", chainID, vote.BlockID,
-			NewCommit(vote.BlockID,
-				[]CommitSig{vote.CommitSig(), {BlockIDFlag: BlockIDFlagAbsent}}), true},
+		{"wrong set size: 1 vs 2", chainID, vote.DataHash,
+			NewCommit(vote.DataHash,
+				[]CommitSig{vote.CommitSig(), {DataHashFlag: DataHashFlagAbsent}}), true},
 
-		{"insufficient voting power: got 0, needed more than 666", chainID, vote.BlockID,
-			NewCommit(vote.BlockID, []CommitSig{{BlockIDFlag: BlockIDFlagAbsent}}), true},
+		{"insufficient voting power: got 0, needed more than 666", chainID, vote.DataHash,
+			NewCommit(vote.DataHash, []CommitSig{{DataHashFlag: DataHashFlagAbsent}}), true},
 
-		{"wrong signature (#0)", chainID, vote.BlockID,
-			NewCommit(vote.BlockID, []CommitSig{vote2.CommitSig()}), true},
+		{"wrong signature (#0)", chainID, vote.DataHash,
+			NewCommit(vote.DataHash, []CommitSig{vote2.CommitSig()}), true},
 	}
 
 	for _, tc := range testCases {
@@ -747,7 +747,7 @@ func TestValidatorSet_VerifyCommit_CheckAllSignatures(t *testing.T) {
 	var (
 		chainID = "test_chain_id"
 		h       = int64(3)
-		blockID = makeBlockIDRandom()
+		blockID = makeDataHashRandom()
 	)
 
 	voteSet, valSet, vals := randVoteSet(h, 0, pb.PrecommitType, 4, 10)
@@ -772,7 +772,7 @@ func TestValidatorSet_VerifyCommitLight_ReturnsAsSoonAsMajorityOfVotingPowerSign
 	var (
 		chainID = "test_chain_id"
 		h       = int64(3)
-		blockID = makeBlockIDRandom()
+		blockID = makeDataHashRandom()
 	)
 
 	voteSet, valSet, vals := randVoteSet(h, 0, pb.PrecommitType, 4, 10)
@@ -795,7 +795,7 @@ func TestValidatorSet_VerifyCommitLightTrusting_ReturnsAsSoonAsTrustLevelOfVotin
 	var (
 		chainID = "test_chain_id"
 		h       = int64(3)
-		blockID = makeBlockIDRandom()
+		blockID = makeDataHashRandom()
 	)
 
 	voteSet, valSet, vals := randVoteSet(h, 0, pb.PrecommitType, 4, 10)
@@ -1519,7 +1519,7 @@ func TestValSetUpdateOverflowRelated(t *testing.T) {
 
 func TestValidatorSet_VerifyCommitLightTrusting(t *testing.T) {
 	var (
-		blockID                       = makeBlockIDRandom()
+		blockID                       = makeDataHashRandom()
 		voteSet, originalValset, vals = randVoteSet(1, 1, pb.PrecommitType, 6, 1)
 		commit, err                   = MakeCommit(blockID, 1, 1, voteSet, vals, time.Now())
 		newValSet, _                  = RandValidatorSet(2, 1)
@@ -1560,7 +1560,7 @@ func TestValidatorSet_VerifyCommitLightTrusting(t *testing.T) {
 
 func TestValidatorSet_VerifyCommitLightTrustingErrorsOnOverflow(t *testing.T) {
 	var (
-		blockID               = makeBlockIDRandom()
+		blockID               = makeDataHashRandom()
 		voteSet, valSet, vals = randVoteSet(1, 1, pb.PrecommitType, 1, MaxTotalVotingPower)
 		commit, err           = MakeCommit(blockID, 1, 1, voteSet, vals, time.Now())
 	)

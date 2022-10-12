@@ -14,7 +14,7 @@ import (
 )
 
 func TestMsgToProto(t *testing.T) {
-	bi := BlockID{
+	bi := DataHash{
 		Hash: tmrand.Bytes(32),
 	}
 	pbBi := bi.ToProto()
@@ -36,7 +36,7 @@ func TestMsgToProto(t *testing.T) {
 	val := NewValidator(pk, 100)
 
 	vote, err := MakeVote(
-		1, BlockID{}, &ProposerSet{Proposer: val, Proposers: []*Proposer{val}},
+		1, DataHash{}, &ProposerSet{Proposer: val, Proposers: []*Proposer{val}},
 		pv, "chainID", time.Now())
 	require.NoError(t, err)
 	pbVote := vote.ToProto()
@@ -109,34 +109,34 @@ func TestMsgToProto(t *testing.T) {
 			},
 		}, false},
 		{"successful VoteSetMaj23", &VoteSetMaj23Message{
-			Height:  1,
-			Round:   1,
-			Type:    1,
-			BlockID: bi,
+			Height:   1,
+			Round:    1,
+			Type:     1,
+			DataHash: bi,
 		}, &pb.Message{
 			Sum: &pb.Message_VoteSetMaj23{
 				VoteSetMaj23: &pb.VoteSetMaj23{
-					Height:  1,
-					Round:   1,
-					Type:    1,
-					BlockID: pbBi,
+					Height:   1,
+					Round:    1,
+					Type:     1,
+					DataHash: *pbBi,
 				},
 			},
 		}, false},
 		{"successful VoteSetBits", &VoteSetBitsMessage{
-			Height:  1,
-			Round:   1,
-			Type:    1,
-			BlockID: bi,
-			Votes:   bits,
+			Height:   1,
+			Round:    1,
+			Type:     1,
+			DataHash: bi,
+			Votes:    bits,
 		}, &pb.Message{
 			Sum: &pb.Message_VoteSetBits{
 				VoteSetBits: &pb.VoteSetBits{
-					Height:  1,
-					Round:   1,
-					Type:    1,
-					BlockID: pbBi,
-					Votes:   *pbBits,
+					Height:   1,
+					Round:    1,
+					Type:     1,
+					DataHash: *pbBi,
+					Votes:    *pbBits,
 				},
 			},
 		}, false},

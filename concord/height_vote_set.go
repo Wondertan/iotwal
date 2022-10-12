@@ -67,7 +67,7 @@ func (hvs *HeightVoteSet) AddVote(vote *Vote) (added bool, err error) {
 
 // POLInfo last round and blockID that has +2/3 prevotes for a particular block or nil.
 // Returns -1 if no such round exists.
-func (hvs *HeightVoteSet) POLInfo() (polBlockID BlockID) {
+func (hvs *HeightVoteSet) POLInfo() (polBlockID DataHash) {
 	hvs.mtx.Lock()
 	defer hvs.mtx.Unlock()
 	rvs := hvs.VoteSet(pb.PrevoteType)
@@ -76,7 +76,7 @@ func (hvs *HeightVoteSet) POLInfo() (polBlockID BlockID) {
 		return polBlockID
 	}
 
-	return BlockID{}
+	return DataHash{}
 }
 
 func (hvs *HeightVoteSet) VoteSet(voteType pb.SignedMsgType) *VoteSet {
@@ -99,7 +99,7 @@ func (hvs *HeightVoteSet) VoteSet(voteType pb.SignedMsgType) *VoteSet {
 func (hvs *HeightVoteSet) SetPeerMaj23(
 	voteType pb.SignedMsgType,
 	peerID peer.ID,
-	blockID BlockID) error {
+	blockID DataHash) error {
 	hvs.mtx.Lock()
 	defer hvs.mtx.Unlock()
 	if !IsVoteTypeValid(voteType) {
