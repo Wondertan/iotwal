@@ -96,17 +96,17 @@ func (r *round) rcvProposal(ctx context.Context, prop *Proposal) error {
 }
 
 // TODO: Timeouts
-func (r *round) Vote(ctx context.Context, hash tmbytes.HexBytes, voteType pb.SignedMsgType) error {
+func (r *round) Vote(ctx context.Context, hash tmbytes.HexBytes, voteType pb.SignedMsgType) (*VoteSet, error) {
 	err := r.vote(ctx, hash, voteType)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	select {
 	case <-r.maj23Dn[voteType]:
-		return nil
+		return r.voteSet.VoteSet(voteType), nil
 	case <-ctx.Done():
-		return ctx.Err()
+		return nil, ctx.Err()
 	}
 }
 
@@ -137,10 +137,6 @@ func (r *round) rcvVote(_ context.Context, v *Vote, from peer.ID) error {
 
 	close(r.maj23Dn[v.Type])
 	return nil
-}
-
-func (r *round) votes(msgType pb.SignedMsgType) *VoteSet {
-	return r.voteSet.VoteSet(msgType)
 }
 
 func (r *round) publish(ctx context.Context, message Message) error {

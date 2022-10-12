@@ -100,17 +100,20 @@ func (c *concord) AgreeOn(ctx context.Context, prop []byte) ([]byte, *Commit, er
 		return nil, nil, err
 	}
 
-	err = c.round.Vote(ctx, hash, pb.PrevoteType)
+	_, err = c.round.Vote(ctx, hash, pb.PrevoteType)
 	if err != nil {
 		return nil, nil, err
 	}
 	// TODO: Do we need to wait for all the votes or can we send PreCommits right after?
-	err = c.round.Vote(ctx, hash, pb.PrecommitType)
+	votes, err := c.round.Vote(ctx, hash, pb.PrecommitType)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	votes := c.round.votes(pb.PrecommitType)
+	if votes.signedMsgType != pb.PrecommitType {
+		return nil, nil, ErrVoteInvalidType
+	}
+
 	return prop, votes.MakeCommit(), nil
 }
 

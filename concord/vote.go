@@ -22,9 +22,10 @@ var (
 	ErrVoteInvalidValidatorIndex     = errors.New("invalid validator index")
 	ErrVoteInvalidValidatorAddress   = errors.New("invalid validator address")
 	ErrVoteInvalidSignature          = errors.New("invalid signature")
-	ErrVoteInvalidBlockHash          = errors.New("invalid block hash")
+	ErrVoteInvalidDataHash           = errors.New("invalid data hash")
 	ErrVoteNonDeterministicSignature = errors.New("non-deterministic signature")
 	ErrVoteNil                       = errors.New("nil vote")
+	ErrVoteInvalidType               = errors.New("invalid vote type")
 )
 
 type ErrVoteConflictingVotes struct {
