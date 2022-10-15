@@ -121,7 +121,7 @@ message Proposal {
   SignedMsgType             type      = 1;
   int32                     round     = 2;
   int32                     pol_round = 3;
-  DataHash                  data_hash      = 4;
+  bytes                     data      = 4;
   google.protobuf.Timestamp timestamp = 5
       [(gogoproto.nullable) = false, (gogoproto.stdtime) = true];
   bytes signature = 6;

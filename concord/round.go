@@ -24,7 +24,7 @@ type round struct {
 	valInfo   *propInfo
 
 	round   int32
-	propCh chan DataHash
+	propCh chan []byte
 	votes  map[pb.SignedMsgType]*VoteSet
 }
 
@@ -34,7 +34,7 @@ func newRound(r int, concordId string, topic *pubsub.Topic, info *propInfo) *rou
 		topic:     topic,
 		valInfo:   info,
 		round:     int32(r),
-		propCh:    make(chan DataHash),
+		propCh:    make(chan []byte),
 		votes: map[pb.SignedMsgType]*VoteSet{
 			pb.PrevoteType:   NewVoteSet(concordId, pb.PrevoteType, info.set),
 			pb.PrecommitType: NewVoteSet(concordId, pb.PrecommitType, info.set),
@@ -54,7 +54,7 @@ func (r *round) Propose(ctx context.Context, data []byte) ([]byte, error) {
 
 	select {
 	case prop := <-r.propCh:
-		return prop.Hash, nil
+		return prop, nil
 	case <-ctx.Done():
 		return nil, ctx.Err()
 	}
