@@ -6,24 +6,24 @@ import (
 	"github.com/tendermint/tendermint/crypto/tmhash"
 )
 
-func makeBlockIDRandom() BlockID {
+func makeDataHashRandom() DataHash {
 	var (
 		blockHash   = make([]byte, tmhash.Size)
 		partSetHash = make([]byte, tmhash.Size)
 	)
 	rand.Read(blockHash)   //nolint: errcheck // ignore errcheck for read
 	rand.Read(partSetHash) //nolint: errcheck // ignore errcheck for read
-	return BlockID{blockHash}
+	return DataHash{blockHash}
 }
 
-func makeBlockID(hash []byte, partSetHash []byte) BlockID {
+func makeDataHash(hash []byte, partSetHash []byte) DataHash {
 	var (
 		h   = make([]byte, tmhash.Size)
 		psH = make([]byte, tmhash.Size)
 	)
 	copy(h, hash)
 	copy(psH, partSetHash)
-	return BlockID{
+	return DataHash{
 		Hash: h,
 	}
 }

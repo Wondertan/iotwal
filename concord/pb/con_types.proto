@@ -45,7 +45,7 @@ message VoteSetMaj23 {
   int64                          height   = 1;
   int32                          round    = 2;
   SignedMsgType type     = 3;
-  BlockID       block_id = 4 [(gogoproto.customname) = "BlockID", (gogoproto.nullable) = false];
+  DataHash       data_hash = 4 [(gogoproto.customname) = "DataHash", (gogoproto.nullable) = false];
 }
 
 // VoteSetBits is sent to communicate the bit-array of votes seen for the BlockID.
@@ -53,7 +53,7 @@ message VoteSetBits {
   int64                          height   = 1;
   int32                          round    = 2;
   SignedMsgType type     = 3;
-  BlockID       block_id = 4 [(gogoproto.customname) = "BlockID", (gogoproto.nullable) = false];
+  DataHash       data_hash = 4 [(gogoproto.customname) = "DataHash", (gogoproto.nullable) = false];
   tendermint.libs.bits.BitArray  votes    = 5 [(gogoproto.nullable) = false];
 }
 

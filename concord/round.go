@@ -20,14 +20,14 @@ type propInfo struct {
 }
 
 type round struct {
-	concordId      string
-	topic          *pubsub.Topic
-	valInfo        *propInfo
+	concordId string
+	topic     *pubsub.Topic
+	valInfo   *propInfo
 
-	round int32
-	votes          *HeightVoteSet // TODO: Instanitiate and reduce to VoteSets
+	round   int32
+	voteSet *HeightVoteSet // TODO: Instanitiate and reduce to VoteSets
 
-	propCh   chan []byte
+	propCh  chan DataHash
 	maj23Dn map[pb.SignedMsgType]chan struct{}
 }
 
@@ -36,17 +36,13 @@ func newRound(r int, concordId string, topic *pubsub.Topic, info *propInfo) *rou
 		concordId: concordId,
 		topic:     topic,
 		valInfo:   info,
-		round: 		int32(r),
-		propCh:    make(chan []byte),
+		round:     int32(r),
+		propCh:    make(chan DataHash),
 		maj23Dn: map[pb.SignedMsgType]chan struct{}{
-			pb.PrevoteType: make(chan struct{}),
+			pb.PrevoteType:   make(chan struct{}),
 			pb.PrecommitType: make(chan struct{}),
 		},
 	}
-}
-
-func (r *round) Round() int {
-	return int(r.round)
 }
 
 // Propose takes a proposal block and gossipes it through the network.
@@ -61,7 +57,7 @@ func (r *round) Propose(ctx context.Context, data []byte) ([]byte, error) {
 
 	select {
 	case prop := <-r.propCh:
-		return prop, nil
+		return prop.Hash, nil
 	case <-ctx.Done():
 		return nil, ctx.Err()
 	}
@@ -100,22 +96,22 @@ func (r *round) rcvProposal(ctx context.Context, prop *Proposal) error {
 }
 
 // TODO: Timeouts
-func (r *round) Vote(ctx context.Context, hash tmbytes.HexBytes, voteType pb.SignedMsgType) error {
+func (r *round) Vote(ctx context.Context, hash tmbytes.HexBytes, voteType pb.SignedMsgType) (*VoteSet, error) {
 	err := r.vote(ctx, hash, voteType)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	select {
 	case <-r.maj23Dn[voteType]:
-		return nil
+		return r.voteSet.VoteSet(voteType), nil
 	case <-ctx.Done():
-		return ctx.Err()
+		return nil, ctx.Err()
 	}
 }
 
 func (r *round) vote(ctx context.Context, hash tmbytes.HexBytes, msgType pb.SignedMsgType) error {
-	vote := NewVote(msgType, r.round, &BlockID{Hash: hash})
+	vote := NewVote(msgType, r.round, &DataHash{Hash: hash})
 	proto := vote.ToProto()
 	err := r.valInfo.self.SignVote(r.concordId, proto)
 	if err != nil {
@@ -128,12 +124,12 @@ func (r *round) vote(ctx context.Context, hash tmbytes.HexBytes, msgType pb.Sign
 
 func (r *round) rcvVote(_ context.Context, v *Vote, from peer.ID) error {
 	// adds the vote and does all the necessary verifications
-	ok, err := r.votes.AddVote(v, from)
+	ok, err := r.voteSet.AddVote(v)
 	if !ok || err != nil {
 		return err
 	}
 
-	set := r.votes.VoteSet(v.Round, v.Type)
+	set := r.voteSet.VoteSet(v.Type)
 	if !set.HasTwoThirdsMajority() {
 		// need to wait more
 		return nil
@@ -158,8 +154,8 @@ func (r *round) publish(ctx context.Context, message Message) error {
 }
 
 var (
-	ErrProposalSignature = errors.New("invalid proposal signature")
-	ErrProposalRound     = errors.New("invalid proposal round")
-	ErrAddingVote               = errors.New("adding vote")
+	ErrProposalSignature          = errors.New("invalid proposal signature")
+	ErrProposalRound              = errors.New("invalid proposal round")
+	ErrAddingVote                 = errors.New("adding vote")
 	ErrSignatureFoundInPastBlocks = errors.New("found signature from the same key")
 )

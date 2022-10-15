@@ -7,5 +7,5 @@ import (
 var log = logging.Logger("conciliator")
 
 type Consensus interface {
-	AgreeOn([]byte) ([]byte, error)
+	AgreeOn([]byte) ([]byte, *Commit, error)
 }

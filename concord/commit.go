@@ -6,13 +6,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Wondertan/iotwal/concord/pb"
 	"github.com/tendermint/tendermint/crypto"
 	"github.com/tendermint/tendermint/crypto/ed25519"
 	"github.com/tendermint/tendermint/crypto/merkle"
 	"github.com/tendermint/tendermint/libs/bits"
 	tmbytes "github.com/tendermint/tendermint/libs/bytes"
 	tmmath "github.com/tendermint/tendermint/libs/math"
+
+	"github.com/Wondertan/iotwal/concord/pb"
 )
 
 var (
@@ -22,7 +23,6 @@ var (
 	MaxSignatureSize = tmmath.MaxInt(ed25519.SignatureSize, 64)
 )
 
-
 // Commit contains the evidence that a block was committed by a set of validators.
 // NOTE: Commit is empty for height 1, but never nil.
 type Commit struct {
@@ -30,9 +30,7 @@ type Commit struct {
 	// ProposerSet order.
 	// Any peer with a block can gossip signatures by index with a peer without
 	// recalculating the active ProposerSet.
-	Height     int64       `json:"height"`
-	Round      int32       `json:"round"`
-	BlockID    BlockID     `json:"block_id"`
+	DataHash   DataHash    `json:"block_id"`
 	Signatures []CommitSig `json:"signatures"`
 
 	// Memoized in first call to corresponding method.
@@ -43,11 +41,9 @@ type Commit struct {
 }
 
 // NewCommit returns a new Commit.
-func NewCommit(height int64, round int32, blockID BlockID, commitSigs []CommitSig) *Commit {
+func NewCommit(DataHash DataHash, commitSigs []CommitSig) *Commit {
 	return &Commit{
-		Height:     height,
-		Round:      round,
-		BlockID:    blockID,
+		DataHash:   DataHash,
 		Signatures: commitSigs,
 	}
 }
@@ -56,7 +52,7 @@ func NewCommit(height int64, round int32, blockID BlockID, commitSigs []CommitSi
 // Panics if signatures from the commit can't be added to the voteset.
 // Inverse of VoteSet.MakeCommit().
 func CommitToVoteSet(chainID string, commit *Commit, vals *ProposerSet) *VoteSet {
-	voteSet := NewVoteSet(chainID, commit.Height, commit.Round, pb.PrecommitType, vals)
+	voteSet := NewVoteSet(chainID, pb.PrecommitType, vals)
 	for idx, commitSig := range commit.Signatures {
 		if commitSig.Absent() {
 			continue // OK, some precommits can be missing.
@@ -76,9 +72,7 @@ func (commit *Commit) GetVote(valIdx int32) *Vote {
 	commitSig := commit.Signatures[valIdx]
 	return &Vote{
 		Type:             pb.PrecommitType,
-		Height:           commit.Height,
-		Round:            commit.Round,
-		BlockID:          commitSig.BlockID(commit.BlockID),
+		DataHash:         commitSig.DataHash(commit.DataHash),
 		Timestamp:        commitSig.Timestamp,
 		ValidatorAddress: commitSig.ValidatorAddress,
 		ValidatorIndex:   valIdx,
@@ -106,18 +100,6 @@ func (commit *Commit) Type() byte {
 	return byte(pb.PrecommitType)
 }
 
-// GetHeight returns height of the commit.
-// Implements VoteSetReader.
-func (commit *Commit) GetHeight() int64 {
-	return commit.Height
-}
-
-// GetRound returns height of the commit.
-// Implements VoteSetReader.
-func (commit *Commit) GetRound() int32 {
-	return commit.Round
-}
-
 // Size returns the number of signatures in the commit.
 // Implements VoteSetReader.
 func (commit *Commit) Size() int {
@@ -127,13 +109,13 @@ func (commit *Commit) Size() int {
 	return len(commit.Signatures)
 }
 
-// BitArray returns a BitArray of which validators voted for BlockID or nil in this commit.
+// BitArray returns a BitArray of which validators voted for DataHash or nil in this commit.
 // Implements VoteSetReader.
 func (commit *Commit) BitArray() *bits.BitArray {
 	if commit.bitArray == nil {
 		commit.bitArray = bits.NewBitArray(len(commit.Signatures))
 		for i, commitSig := range commit.Signatures {
-			// TODO: need to check the BlockID otherwise we could be counting conflicts,
+			// TODO: need to check the DataHash otherwise we could be counting conflicts,
 			// not just the one with +2/3 !
 			commit.bitArray.SetIndex(i, !commitSig.Absent())
 		}
@@ -157,25 +139,16 @@ func (commit *Commit) IsCommit() bool {
 // ValidateBasic performs basic validation that doesn't involve state data.
 // Does not actually check the cryptographic signatures.
 func (commit *Commit) ValidateBasic() error {
-	if commit.Height < 0 {
-		return errors.New("negative Height")
-	}
-	if commit.Round < 0 {
-		return errors.New("negative Round")
+	if commit.DataHash.IsZero() {
+		return errors.New("commit cannot be for nil block")
 	}
 
-	if commit.Height >= 1 {
-		if commit.BlockID.IsZero() {
-			return errors.New("commit cannot be for nil block")
-		}
-
-		if len(commit.Signatures) == 0 {
-			return errors.New("no signatures in commit")
-		}
-		for i, commitSig := range commit.Signatures {
-			if err := commitSig.ValidateBasic(); err != nil {
-				return fmt.Errorf("wrong CommitSig #%d: %v", i, err)
-			}
+	if len(commit.Signatures) == 0 {
+		return errors.New("no signatures in commit")
+	}
+	for i, commitSig := range commit.Signatures {
+		if err := commitSig.ValidateBasic(); err != nil {
+			return fmt.Errorf("wrong CommitSig #%d: %v", i, err)
 		}
 	}
 	return nil
@@ -212,15 +185,11 @@ func (commit *Commit) StringIndented(indent string) string {
 		commitSigStrings[i] = commitSig.String()
 	}
 	return fmt.Sprintf(`Commit{
-%s  Height:     %d
-%s  Round:      %d
-%s  BlockID:    %v
+%s  DataHash:    %v
 %s  Signatures:
 %s    %v
 %s}#%v`,
-		indent, commit.Height,
-		indent, commit.Round,
-		indent, commit.BlockID,
+		indent, commit.DataHash,
 		indent,
 		indent, strings.Join(commitSigStrings, "\n"+indent+"    "),
 		indent, commit.hash)
@@ -238,10 +207,7 @@ func (commit *Commit) ToProto() *pb.Commit {
 		sigs[i] = *commit.Signatures[i].ToProto()
 	}
 	c.Signatures = sigs
-
-	c.Height = commit.Height
-	c.Round = commit.Round
-	c.BlockID = commit.BlockID.ToProto()
+	c.DataHash = *commit.DataHash.ToProto()
 
 	return c
 }
@@ -257,7 +223,7 @@ func CommitFromProto(cp *pb.Commit) (*Commit, error) {
 		commit = new(Commit)
 	)
 
-	bi, err := BlockIDFromProto(&cp.BlockID)
+	bi, err := DataHashFromProto(&cp.DataHash)
 	if err != nil {
 		return nil, err
 	}
@@ -270,28 +236,25 @@ func CommitFromProto(cp *pb.Commit) (*Commit, error) {
 	}
 	commit.Signatures = sigs
 
-	commit.Height = cp.Height
-	commit.Round = cp.Round
-	commit.BlockID = *bi
+	commit.DataHash = *bi
 
 	return commit, commit.ValidateBasic()
 }
 
-
-// BlockIDFlag indicates which BlockID the signature is for.
-type BlockIDFlag byte
+// DataHashFlag indicates which DataHash the signature is for.
+type DataHashFlag byte
 
 const (
-	// BlockIDFlagAbsent - no vote was received from a validator.
-	BlockIDFlagAbsent BlockIDFlag = iota + 1
-	// BlockIDFlagCommit - voted for the Commit.BlockID.
-	BlockIDFlagCommit
-	// BlockIDFlagNil - voted for nil.
-	BlockIDFlagNil
+	// DataHashFlagAbsent - no vote was received from a validator.
+	DataHashFlagAbsent DataHashFlag = iota + 1
+	// DataHashFlagCommit - voted for the Commit.DataHash.
+	DataHashFlagCommit
+	// DataHashFlagNil - voted for nil.
+	DataHashFlagNil
 )
 
 const (
-	// Max size of commit without any commitSigs -> 82 for BlockID, 8 for Height, 4 for Round.
+	// Max size of commit without any commitSigs -> 82 for DataHash, 8 for Height, 4 for Round.
 	MaxCommitOverheadBytes int64 = 94
 	// Commit sig size is made up of 64 bytes for the signature, 20 bytes for the address,
 	// 1 byte for the flag and 14 bytes for the timestamp
@@ -300,16 +263,16 @@ const (
 
 // CommitSig is a part of the Vote included in a Commit.
 type CommitSig struct {
-	BlockIDFlag      BlockIDFlag `json:"block_id_flag"`
-	ValidatorAddress Address     `json:"validator_address"`
-	Timestamp        time.Time   `json:"timestamp"`
-	Signature        []byte      `json:"signature"`
+	DataHashFlag     DataHashFlag `json:"block_id_flag"`
+	ValidatorAddress Address      `json:"validator_address"`
+	Timestamp        time.Time    `json:"timestamp"`
+	Signature        []byte       `json:"signature"`
 }
 
-// NewCommitSigForBlock returns new CommitSig with BlockIDFlagCommit.
+// NewCommitSigForBlock returns new CommitSig with DataHashFlagCommit.
 func NewCommitSigForBlock(signature []byte, valAddr Address, ts time.Time) CommitSig {
 	return CommitSig{
-		BlockIDFlag:      BlockIDFlagCommit,
+		DataHashFlag:     DataHashFlagCommit,
 		ValidatorAddress: valAddr,
 		Timestamp:        ts,
 		Signature:        signature,
@@ -322,22 +285,22 @@ func MaxCommitBytes(valCount int) int64 {
 	return MaxCommitOverheadBytes + ((MaxCommitSigBytes + protoEncodingOverhead) * int64(valCount))
 }
 
-// NewCommitSigAbsent returns new CommitSig with BlockIDFlagAbsent. Other
+// NewCommitSigAbsent returns new CommitSig with DataHashFlagAbsent. Other
 // fields are all empty.
 func NewCommitSigAbsent() CommitSig {
 	return CommitSig{
-		BlockIDFlag: BlockIDFlagAbsent,
+		DataHashFlag: DataHashFlagAbsent,
 	}
 }
 
 // ForBlock returns true if CommitSig is for the block.
 func (cs CommitSig) ForBlock() bool {
-	return cs.BlockIDFlag == BlockIDFlagCommit
+	return cs.DataHashFlag == DataHashFlagCommit
 }
 
 // Absent returns true if CommitSig is absent.
 func (cs CommitSig) Absent() bool {
-	return cs.BlockIDFlag == BlockIDFlagAbsent
+	return cs.DataHashFlag == DataHashFlagAbsent
 }
 
 // CommitSig returns a string representation of CommitSig.
@@ -350,39 +313,39 @@ func (cs CommitSig) String() string {
 	return fmt.Sprintf("CommitSig{%X by %X on %v @ %s}",
 		tmbytes.Fingerprint(cs.Signature),
 		tmbytes.Fingerprint(cs.ValidatorAddress),
-		cs.BlockIDFlag,
+		cs.DataHashFlag,
 		CanonicalTime(cs.Timestamp))
 }
 
-// BlockID returns the Commit's BlockID if CommitSig indicates signing,
-// otherwise - empty BlockID.
-func (cs CommitSig) BlockID(commitBlockID BlockID) BlockID {
-	var blockID BlockID
-	switch cs.BlockIDFlag {
-	case BlockIDFlagAbsent:
-		blockID = BlockID{}
-	case BlockIDFlagCommit:
-		blockID = commitBlockID
-	case BlockIDFlagNil:
-		blockID = BlockID{}
+// DataHash returns the Commit's DataHash if CommitSig indicates signing,
+// otherwise - empty DataHash.
+func (cs CommitSig) DataHash(commitDataHash DataHash) DataHash {
+	var dataHash DataHash
+	switch cs.DataHashFlag {
+	case DataHashFlagAbsent:
+		dataHash = DataHash{}
+	case DataHashFlagCommit:
+		dataHash = commitDataHash
+	case DataHashFlagNil:
+		dataHash = DataHash{}
 	default:
-		panic(fmt.Sprintf("Unknown BlockIDFlag: %v", cs.BlockIDFlag))
+		panic(fmt.Sprintf("Unknown DataHashFlag: %v", cs.DataHashFlag))
 	}
-	return blockID
+	return dataHash
 }
 
 // ValidateBasic performs basic validation.
 func (cs CommitSig) ValidateBasic() error {
-	switch cs.BlockIDFlag {
-	case BlockIDFlagAbsent:
-	case BlockIDFlagCommit:
-	case BlockIDFlagNil:
+	switch cs.DataHashFlag {
+	case DataHashFlagAbsent:
+	case DataHashFlagCommit:
+	case DataHashFlagNil:
 	default:
-		return fmt.Errorf("unknown BlockIDFlag: %v", cs.BlockIDFlag)
+		return fmt.Errorf("unknown DataHashFlag: %v", cs.DataHashFlag)
 	}
 
-	switch cs.BlockIDFlag {
-	case BlockIDFlagAbsent:
+	switch cs.DataHashFlag {
+	case DataHashFlagAbsent:
 		if len(cs.ValidatorAddress) != 0 {
 			return errors.New("validator address is present")
 		}
@@ -418,7 +381,7 @@ func (cs *CommitSig) ToProto() *pb.CommitSig {
 	}
 
 	return &pb.CommitSig{
-		BlockIdFlag:      pb.BlockIDFlag(cs.BlockIDFlag),
+		DataHashFlag:     pb.DataHashFlag(cs.DataHashFlag),
 		ValidatorAddress: cs.ValidatorAddress,
 		Timestamp:        cs.Timestamp,
 		Signature:        cs.Signature,
@@ -429,7 +392,7 @@ func (cs *CommitSig) ToProto() *pb.CommitSig {
 // It returns an error if the CommitSig is invalid.
 func (cs *CommitSig) FromProto(csp pb.CommitSig) error {
 
-	cs.BlockIDFlag = BlockIDFlag(csp.BlockIdFlag)
+	cs.DataHashFlag = DataHashFlag(csp.DataHashFlag)
 	cs.ValidatorAddress = csp.ValidatorAddress
 	cs.Timestamp = csp.Timestamp
 	cs.Signature = csp.Signature

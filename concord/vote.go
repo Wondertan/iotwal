@@ -22,9 +22,10 @@ var (
 	ErrVoteInvalidValidatorIndex     = errors.New("invalid validator index")
 	ErrVoteInvalidValidatorAddress   = errors.New("invalid validator address")
 	ErrVoteInvalidSignature          = errors.New("invalid signature")
-	ErrVoteInvalidBlockHash          = errors.New("invalid block hash")
+	ErrVoteInvalidDataHash           = errors.New("invalid data hash")
 	ErrVoteNonDeterministicSignature = errors.New("non-deterministic signature")
 	ErrVoteNil                       = errors.New("nil vote")
+	ErrVoteInvalidType               = errors.New("invalid vote type")
 )
 
 type ErrVoteConflictingVotes struct {
@@ -50,17 +51,15 @@ type Address = crypto.Address
 // consensus.
 type Vote struct {
 	Type             pb.SignedMsgType `json:"type"`
-	Height           int64            `json:"height"`
-	Round            int32            `json:"round"`    // assume there will not be greater than 2_147_483_647 rounds
-	BlockID          BlockID          `json:"block_id"` // zero if vote is nil.
+	DataHash         DataHash         `json:"block_id"` // zero if vote is nil.
 	Timestamp        time.Time        `json:"timestamp"`
 	ValidatorAddress Address          `json:"validator_address"`
 	ValidatorIndex   int32            `json:"validator_index"`
 	Signature        []byte           `json:"signature"`
 }
 
-func NewVote(t pb.SignedMsgType, round int32, blockID *BlockID) *Vote {
-	return &Vote{Type: t, Round: round, BlockID: *blockID, Timestamp: time.Now()}
+func NewVote(t pb.SignedMsgType, round int32, dataHash *DataHash) *Vote {
+	return &Vote{Type: t, DataHash: *dataHash, Timestamp: time.Now()}
 }
 
 // CommitSig converts the Vote to a CommitSig.
@@ -69,18 +68,18 @@ func (vote *Vote) CommitSig() CommitSig {
 		return NewCommitSigAbsent()
 	}
 
-	var blockIDFlag BlockIDFlag
+	var DataHashFlag DataHashFlag
 	switch {
-	case vote.BlockID.IsComplete():
-		blockIDFlag = BlockIDFlagCommit
-	case vote.BlockID.IsZero():
-		blockIDFlag = BlockIDFlagNil
+	case vote.DataHash.IsComplete():
+		DataHashFlag = DataHashFlagCommit
+	case vote.DataHash.IsZero():
+		DataHashFlag = DataHashFlagNil
 	default:
-		panic(fmt.Sprintf("Invalid vote %v - expected BlockID to be either empty or complete", vote))
+		panic(fmt.Sprintf("Invalid vote %v - expected DataHash to be either empty or complete", vote))
 	}
 
 	return CommitSig{
-		BlockIDFlag:      blockIDFlag,
+		DataHashFlag:     DataHashFlag,
 		ValidatorAddress: vote.ValidatorAddress,
 		Timestamp:        vote.Timestamp,
 		Signature:        vote.Signature,
@@ -136,14 +135,12 @@ func (vote *Vote) String() string {
 		panic("Unknown vote type")
 	}
 
-	return fmt.Sprintf("Vote{%v:%X %v/%02d/%v(%v) %X %X @ %s}",
+	return fmt.Sprintf("Vote{%v:%X %v(%v) %X %X @ %s}",
 		vote.ValidatorIndex,
 		tmbytes.Fingerprint(vote.ValidatorAddress),
-		vote.Height,
-		vote.Round,
 		vote.Type,
 		typeString,
-		tmbytes.Fingerprint(vote.BlockID.Hash),
+		tmbytes.Fingerprint(vote.DataHash.Hash),
 		tmbytes.Fingerprint(vote.Signature),
 		CanonicalTime(vote.Timestamp),
 	)
@@ -166,24 +163,16 @@ func (vote *Vote) ValidateBasic() error {
 		return errors.New("invalid Type")
 	}
 
-	if vote.Height < 0 {
-		return errors.New("negative Height")
-	}
-
-	if vote.Round < 0 {
-		return errors.New("negative Round")
-	}
-
 	// NOTE: Timestamp validation is subtle and handled elsewhere.
 
-	if err := vote.BlockID.ValidateBasic(); err != nil {
-		return fmt.Errorf("wrong BlockID: %v", err)
+	if err := vote.DataHash.ValidateBasic(); err != nil {
+		return fmt.Errorf("wrong DataHash: %v", err)
 	}
 
-	// BlockID.ValidateBasic would not err if we for instance have an empty hash but a
+	// DataHash.ValidateBasic would not err if we for instance have an empty hash but a
 	// non-empty PartsSetHeader:
-	if !vote.BlockID.IsZero() && !vote.BlockID.IsComplete() {
-		return fmt.Errorf("blockID must be either empty or complete, got: %v", vote.BlockID)
+	if !vote.DataHash.IsZero() && !vote.DataHash.IsComplete() {
+		return fmt.Errorf("DataHash must be either empty or complete, got: %v", vote.DataHash)
 	}
 
 	if len(vote.ValidatorAddress) != crypto.AddressSize {
@@ -215,9 +204,7 @@ func (vote *Vote) ToProto() *pb.Vote {
 
 	return &pb.Vote{
 		Type:             vote.Type,
-		Height:           vote.Height,
-		Round:            vote.Round,
-		BlockID:          vote.BlockID.ToProto(),
+		DataHash:         *vote.DataHash.ToProto(),
 		Timestamp:        vote.Timestamp,
 		ValidatorAddress: vote.ValidatorAddress,
 		ValidatorIndex:   vote.ValidatorIndex,
@@ -232,16 +219,14 @@ func VoteFromProto(pv *pb.Vote) (*Vote, error) {
 		return nil, errors.New("nil vote")
 	}
 
-	blockID, err := BlockIDFromProto(&pv.BlockID)
+	DataHash, err := DataHashFromProto(&pv.DataHash)
 	if err != nil {
 		return nil, err
 	}
 
 	vote := new(Vote)
 	vote.Type = pv.Type
-	vote.Height = pv.Height
-	vote.Round = pv.Round
-	vote.BlockID = *blockID
+	vote.DataHash = *DataHash
 	vote.Timestamp = pv.Timestamp
 	vote.ValidatorAddress = pv.ValidatorAddress
 	vote.ValidatorIndex = pv.ValidatorIndex

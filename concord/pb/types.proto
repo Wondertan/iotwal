@@ -6,15 +6,15 @@ import "google/protobuf/timestamp.proto";
 import "tendermint/crypto/proof.proto";
 import "tendermint/version/types.proto";
 
-// BlockIdFlag indicates which BlcokID the signature is for
-enum BlockIDFlag {
+// DataHashFlag indicates which DataHash the signature is for
+enum DataHashFlag {
   option (gogoproto.goproto_enum_stringer) = true;
   option (gogoproto.goproto_enum_prefix)   = false;
 
-  BLOCK_ID_FLAG_UNKNOWN = 0 [(gogoproto.enumvalue_customname) = "BlockIDFlagUnknown"];
-  BLOCK_ID_FLAG_ABSENT  = 1 [(gogoproto.enumvalue_customname) = "BlockIDFlagAbsent"];
-  BLOCK_ID_FLAG_COMMIT  = 2 [(gogoproto.enumvalue_customname) = "BlockIDFlagCommit"];
-  BLOCK_ID_FLAG_NIL     = 3 [(gogoproto.enumvalue_customname) = "BlockIDFlagNil"];
+  DATA_HASH_FLAG_UNKNOWN = 0 [(gogoproto.enumvalue_customname) = "DataHashFlagUnknown"];
+  DATA_HASH_FLAG_ABSENT  = 1 [(gogoproto.enumvalue_customname) = "DataHashFlagAbsent"];
+  DATA_HASH_FLAG_COMMIT  = 2 [(gogoproto.enumvalue_customname) = "DataHashFlagCommit"];
+  DATA_HASH_FLAG_NIL     = 3 [(gogoproto.enumvalue_customname) = "DataHashFlagNil"];
 }
 
 // SignedMsgType is a type of signed message in the consensus.
@@ -43,8 +43,8 @@ message Part {
   tendermint.crypto.Proof proof = 3 [(gogoproto.nullable) = false];
 }
 
-// BlockID
-message BlockID {
+// DataHash
+message DataHash {
   bytes         hash            = 1;
 }
 
@@ -59,7 +59,7 @@ message Header {
   google.protobuf.Timestamp    time     = 4 [(gogoproto.nullable) = false, (gogoproto.stdtime) = true];
 
   // prev block info
-  BlockID last_block_id = 5 [(gogoproto.nullable) = false];
+  DataHash last_data_hash = 5 [(gogoproto.nullable) = false];
 
   // hashes of block data
   bytes last_commit_hash = 6;  // commit from validators from the last block
@@ -91,8 +91,8 @@ message Vote {
   SignedMsgType type     = 1;
   int64         height   = 2;
   int32         round    = 3;
-  BlockID       block_id = 4
-      [(gogoproto.nullable) = false, (gogoproto.customname) = "BlockID"];  // zero if vote is nil.
+  DataHash       data_hash = 4
+      [(gogoproto.nullable) = false, (gogoproto.customname) = "DataHash"];  // zero if vote is nil.
   google.protobuf.Timestamp timestamp = 5
       [(gogoproto.nullable) = false, (gogoproto.stdtime) = true];
   bytes validator_address = 6;
@@ -104,13 +104,13 @@ message Vote {
 message Commit {
   int64                         height     = 1;
   int32                         round      = 2;
-  BlockID                       block_id   = 3 [(gogoproto.nullable) = false, (gogoproto.customname) = "BlockID"];
+  DataHash                      data_hash   = 3 [(gogoproto.nullable) = false, (gogoproto.customname) = "DataHash"];
   repeated CommitSig            signatures = 4 [(gogoproto.nullable) = false];
 }
 
 // CommitSig is a part of the Vote included in a Commit.
 message CommitSig {
-  BlockIDFlag               block_id_flag     = 1;
+  DataHashFlag               data_hash_flag     = 1;
   bytes                     validator_address = 2;
   google.protobuf.Timestamp timestamp         = 3
       [(gogoproto.nullable) = false, (gogoproto.stdtime) = true];
@@ -121,7 +121,7 @@ message Proposal {
   SignedMsgType             type      = 1;
   int32                     round     = 2;
   int32                     pol_round = 3;
-  bytes                     data      = 4;
+  DataHash                  data_hash      = 4;
   google.protobuf.Timestamp timestamp = 5
       [(gogoproto.nullable) = false, (gogoproto.stdtime) = true];
   bytes signature = 6;

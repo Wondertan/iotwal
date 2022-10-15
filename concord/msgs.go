@@ -4,9 +4,10 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/Wondertan/iotwal/concord/pb"
 	"github.com/gogo/protobuf/proto"
 	"github.com/tendermint/tendermint/libs/bits"
+
+	"github.com/Wondertan/iotwal/concord/pb"
 )
 
 //-----------------------------------------------------------------------------
@@ -14,10 +15,8 @@ import (
 
 // Message is a message that can be sent and received on the Reactor
 type Message interface {
-	Round() int
 	ValidateBasic() error
 }
-
 
 func decodeMsg(bz []byte) (msg Message, err error) {
 	pb := &pb.Message{}
@@ -93,10 +92,10 @@ func (m *NewRoundStepMessage) String() string {
 // i.e., there is a Proposal for block B and 2/3+ prevotes for the block B in the round r.
 // In case the block is also committed, then IsCommit flag is set to true.
 type NewValidBlockMessage struct {
-	Height             int64
-	Round              int32
+	Height int64
+	Round  int32
 	// TODO: BlockParts removed, requires some sort of ID
-	IsCommit           bool
+	IsCommit bool
 }
 
 // ValidateBasic performs basic validation.
@@ -121,10 +120,6 @@ func (m *NewValidBlockMessage) String() string {
 // ProposalMessage is sent when a new block is proposed.
 type ProposalMessage struct {
 	Proposal *Proposal
-}
-
-func (m *ProposalMessage) Round() int {
-	return int(m.Proposal.Round)
 }
 
 // ValidateBasic performs basic validation.
@@ -168,7 +163,6 @@ func (m *ProposalPOLMessage) String() string {
 	return fmt.Sprintf("[ProposalPOL H:%v POLR:%v POL:%v]", m.Height, m.ProposalPOLRound, m.ProposalPOL)
 }
 
-
 // VoteMessage is sent when voting for a proposal (or lack thereof).
 type VoteMessage struct {
 	Vote *Vote
@@ -177,10 +171,6 @@ type VoteMessage struct {
 // ValidateBasic performs basic validation.
 func (m *VoteMessage) ValidateBasic() error {
 	return m.Vote.ValidateBasic()
-}
-
-func (m *VoteMessage) Round() int {
-	return int(m.Vote.Round)
 }
 
 // String returns a string representation.
@@ -224,10 +214,10 @@ func (m *HasVoteMessage) String() string {
 
 // VoteSetMaj23Message is sent to indicate that a given BlockID has seen +2/3 votes.
 type VoteSetMaj23Message struct {
-	Height  int64
-	Round   int32
-	Type    pb.SignedMsgType
-	BlockID BlockID
+	Height   int64
+	Round    int32
+	Type     pb.SignedMsgType
+	DataHash DataHash
 }
 
 // ValidateBasic performs basic validation.
@@ -241,7 +231,7 @@ func (m *VoteSetMaj23Message) ValidateBasic() error {
 	if !IsVoteTypeValid(m.Type) {
 		return errors.New("invalid Type")
 	}
-	if err := m.BlockID.ValidateBasic(); err != nil {
+	if err := m.DataHash.ValidateBasic(); err != nil {
 		return fmt.Errorf("wrong BlockID: %v", err)
 	}
 	return nil
@@ -249,18 +239,18 @@ func (m *VoteSetMaj23Message) ValidateBasic() error {
 
 // String returns a string representation.
 func (m *VoteSetMaj23Message) String() string {
-	return fmt.Sprintf("[VSM23 %v/%02d/%v %v]", m.Height, m.Round, m.Type, m.BlockID)
+	return fmt.Sprintf("[VSM23 %v %v]", m.Type, m.DataHash)
 }
 
 //-------------------------------------
 
 // VoteSetBitsMessage is sent to communicate the bit-array of votes seen for the BlockID.
 type VoteSetBitsMessage struct {
-	Height  int64
-	Round   int32
-	Type    pb.SignedMsgType
-	BlockID BlockID
-	Votes   *bits.BitArray
+	Height   int64
+	Round    int32
+	Type     pb.SignedMsgType
+	DataHash DataHash
+	Votes    *bits.BitArray
 }
 
 // ValidateBasic performs basic validation.
@@ -271,7 +261,7 @@ func (m *VoteSetBitsMessage) ValidateBasic() error {
 	if !IsVoteTypeValid(m.Type) {
 		return errors.New("invalid Type")
 	}
-	if err := m.BlockID.ValidateBasic(); err != nil {
+	if err := m.DataHash.ValidateBasic(); err != nil {
 		return fmt.Errorf("wrong BlockID: %v", err)
 	}
 	// NOTE: Votes.Size() can be zero if the node does not have any
@@ -283,7 +273,7 @@ func (m *VoteSetBitsMessage) ValidateBasic() error {
 
 // String returns a string representation.
 func (m *VoteSetBitsMessage) String() string {
-	return fmt.Sprintf("[VSB %v/%02d/%v %v %v]", m.Height, m.Round, m.Type, m.BlockID, m.Votes)
+	return fmt.Sprintf("[VSB %v/%02d/%v %v %v]", m.Height, m.Round, m.Type, m.DataHash, m.Votes)
 }
 
 //-------------------------------------

@@ -11,15 +11,15 @@ import (
 
 func TestCanonicalizeBlockID(t *testing.T) {
 	randhash := tmrand.Bytes(tmhash.Size)
-	block1 := pb.BlockID{Hash: randhash}
-	block2 := pb.BlockID{Hash: randhash}
-	cblock1 := pb.CanonicalBlockID{Hash: randhash}
-	cblock2 := pb.CanonicalBlockID{Hash: randhash}
+	block1 := pb.DataHash{Hash: randhash}
+	block2 := pb.DataHash{Hash: randhash}
+	cblock1 := pb.CanonicalDataHash{Hash: randhash}
+	cblock2 := pb.CanonicalDataHash{Hash: randhash}
 
 	tests := []struct {
 		name string
-		args pb.BlockID
-		want *pb.CanonicalBlockID
+		args pb.DataHash
+		want *pb.CanonicalDataHash
 	}{
 		{"first", block1, &cblock1},
 		{"second", block2, &cblock2},
@@ -27,7 +27,7 @@ func TestCanonicalizeBlockID(t *testing.T) {
 	for _, tt := range tests {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-			if got := CanonicalizeBlockID(tt.args); !reflect.DeepEqual(got, tt.want) {
+			if got := CanonicalizeDataHash(&tt.args); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("CanonicalizeBlockID() = %v, want %v", got, tt.want)
 			}
 		})

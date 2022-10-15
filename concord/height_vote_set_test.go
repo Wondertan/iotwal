@@ -25,22 +25,22 @@ func TestMain(m *testing.M) {
 func TestPeerCatchupRounds(t *testing.T) {
 	valSet, privVals := RandValidatorSet(10, 1)
 
-	hvs := NewHeightVoteSet(config.ChainID(), 1, valSet)
+	hvs := NewHeightVoteSet(config.ChainID(), valSet)
 
 	vote999_0 := makeVoteHR(t, 1, 0, 999, privVals)
-	added, err := hvs.AddVote(vote999_0, "peer1")
+	added, err := hvs.AddVote(vote999_0)
 	if !added || err != nil {
 		t.Error("Expected to successfully add vote from peer", added, err)
 	}
 
 	vote1000_0 := makeVoteHR(t, 1, 0, 1000, privVals)
-	added, err = hvs.AddVote(vote1000_0, "peer1")
+	added, err = hvs.AddVote(vote1000_0)
 	if !added || err != nil {
 		t.Error("Expected to successfully add vote from peer", added, err)
 	}
 
 	vote1001_0 := makeVoteHR(t, 1, 0, 1001, privVals)
-	added, err = hvs.AddVote(vote1001_0, "peer1")
+	added, err = hvs.AddVote(vote1001_0)
 	if err != ErrGotVoteFromUnwantedRound {
 		t.Errorf("expected GotVoteFromUnwantedRoundError, but got %v", err)
 	}
@@ -48,7 +48,7 @@ func TestPeerCatchupRounds(t *testing.T) {
 		t.Error("Expected to *not* add vote from peer, too many catchup rounds.")
 	}
 
-	added, err = hvs.AddVote(vote1001_0, "peer2")
+	added, err = hvs.AddVote(vote1001_0)
 	if !added || err != nil {
 		t.Error("Expected to successfully add vote from another peer")
 	}
@@ -67,11 +67,9 @@ func makeVoteHR(t *testing.T, height int64, valIndex, round int32, privVals []Pr
 	vote := &Vote{
 		ValidatorAddress: pubKey.Address(),
 		ValidatorIndex:   valIndex,
-		Height:           height,
-		Round:            round,
 		Timestamp:        tmtime.Now(),
 		Type:             pb.PrecommitType,
-		BlockID:          BlockID{Hash: randBytes},
+		DataHash:         DataHash{Hash: randBytes},
 	}
 	chainID := config.ChainID()
 

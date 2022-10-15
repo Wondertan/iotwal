@@ -7,10 +7,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/Wondertan/iotwal/concord/pb"
 	"github.com/tendermint/tendermint/crypto"
 	tmrand "github.com/tendermint/tendermint/libs/rand"
 	tmtime "github.com/tendermint/tendermint/types/time"
+
+	"github.com/Wondertan/iotwal/concord/pb"
 )
 
 func TestVoteSet_AddVote_Good(t *testing.T) {
@@ -24,25 +25,23 @@ func TestVoteSet_AddVote_Good(t *testing.T) {
 
 	assert.Nil(t, voteSet.GetByAddress(val0Addr))
 	assert.False(t, voteSet.BitArray().GetIndex(0))
-	blockID, ok := voteSet.TwoThirdsMajority()
-	assert.False(t, ok || !blockID.IsZero(), "there should be no 2/3 majority")
+	dataHash, ok := voteSet.TwoThirdsMajority()
+	assert.False(t, ok || !dataHash.IsZero(), "there should be no 2/3 majority")
 
 	vote := &Vote{
 		ValidatorAddress: val0Addr,
 		ValidatorIndex:   0, // since privValidators are in order
-		Height:           height,
-		Round:            round,
 		Type:             pb.PrevoteType,
 		Timestamp:        tmtime.Now(),
-		BlockID:          BlockID{nil},
+		DataHash:         DataHash{nil},
 	}
 	_, err = signAddVote(val0, vote, voteSet)
 	require.NoError(t, err)
 
 	assert.NotNil(t, voteSet.GetByAddress(val0Addr))
 	assert.True(t, voteSet.BitArray().GetIndex(0))
-	blockID, ok = voteSet.TwoThirdsMajority()
-	assert.False(t, ok || !blockID.IsZero(), "there should be no 2/3 majority")
+	dataHash, ok = voteSet.TwoThirdsMajority()
+	assert.False(t, ok || !dataHash.IsZero(), "there should be no 2/3 majority")
 }
 
 func TestVoteSet_AddVote_Bad(t *testing.T) {
@@ -52,11 +51,9 @@ func TestVoteSet_AddVote_Bad(t *testing.T) {
 	voteProto := &Vote{
 		ValidatorAddress: nil,
 		ValidatorIndex:   -1,
-		Height:           height,
-		Round:            round,
 		Timestamp:        tmtime.Now(),
 		Type:             pb.PrevoteType,
-		BlockID:          BlockID{nil},
+		DataHash:         DataHash{nil},
 	}
 
 	// val0 votes for nil.
@@ -89,7 +86,7 @@ func TestVoteSet_AddVote_Bad(t *testing.T) {
 		require.NoError(t, err)
 		addr := pubKey.Address()
 		vote := withValidator(voteProto, addr, 1)
-		added, err := signAddVote(privValidators[1], withHeight(vote, height+1), voteSet)
+		added, err := signAddVote(privValidators[1], vote, voteSet)
 		if added || err == nil {
 			t.Errorf("expected VoteSet.Add to fail, wrong height")
 		}
@@ -101,7 +98,7 @@ func TestVoteSet_AddVote_Bad(t *testing.T) {
 		require.NoError(t, err)
 		addr := pubKey.Address()
 		vote := withValidator(voteProto, addr, 2)
-		added, err := signAddVote(privValidators[2], withRound(vote, round+1), voteSet)
+		added, err := signAddVote(privValidators[2], vote, voteSet)
 		if added || err == nil {
 			t.Errorf("expected VoteSet.Add to fail, wrong round")
 		}
@@ -127,11 +124,9 @@ func TestVoteSet_2_3Majority(t *testing.T) {
 	voteProto := &Vote{
 		ValidatorAddress: nil, // NOTE: must fill in
 		ValidatorIndex:   -1,  // NOTE: must fill in
-		Height:           height,
-		Round:            round,
 		Type:             pb.PrevoteType,
 		Timestamp:        tmtime.Now(),
-		BlockID:          BlockID{nil},
+		DataHash:         DataHash{nil},
 	}
 	// 6 out of 10 voted for nil.
 	for i := int32(0); i < 6; i++ {
@@ -142,8 +137,8 @@ func TestVoteSet_2_3Majority(t *testing.T) {
 		_, err = signAddVote(privValidators[i], vote, voteSet)
 		require.NoError(t, err)
 	}
-	blockID, ok := voteSet.TwoThirdsMajority()
-	assert.False(t, ok || !blockID.IsZero(), "there should be no 2/3 majority")
+	DataHash, ok := voteSet.TwoThirdsMajority()
+	assert.False(t, ok || !DataHash.IsZero(), "there should be no 2/3 majority")
 
 	// 7th validator voted for some blockhash
 	{
@@ -153,8 +148,8 @@ func TestVoteSet_2_3Majority(t *testing.T) {
 		vote := withValidator(voteProto, addr, 6)
 		_, err = signAddVote(privValidators[6], withBlockHash(vote, tmrand.Bytes(32)), voteSet)
 		require.NoError(t, err)
-		blockID, ok = voteSet.TwoThirdsMajority()
-		assert.False(t, ok || !blockID.IsZero(), "there should be no 2/3 majority")
+		DataHash, ok = voteSet.TwoThirdsMajority()
+		assert.False(t, ok || !DataHash.IsZero(), "there should be no 2/3 majority")
 	}
 
 	// 8th validator voted for nil.
@@ -165,8 +160,8 @@ func TestVoteSet_2_3Majority(t *testing.T) {
 		vote := withValidator(voteProto, addr, 7)
 		_, err = signAddVote(privValidators[7], vote, voteSet)
 		require.NoError(t, err)
-		blockID, ok = voteSet.TwoThirdsMajority()
-		assert.True(t, ok || blockID.IsZero(), "there should be 2/3 majority for nil")
+		DataHash, ok = voteSet.TwoThirdsMajority()
+		assert.True(t, ok || DataHash.IsZero(), "there should be 2/3 majority for nil")
 	}
 }
 
@@ -179,11 +174,9 @@ func TestVoteSet_2_3MajorityRedux(t *testing.T) {
 	voteProto := &Vote{
 		ValidatorAddress: nil, // NOTE: must fill in
 		ValidatorIndex:   -1,  // NOTE: must fill in
-		Height:           height,
-		Round:            round,
 		Timestamp:        tmtime.Now(),
 		Type:             pb.PrevoteType,
-		BlockID:          BlockID{blockHash},
+		DataHash:         DataHash{blockHash},
 	}
 
 	// 66 out of 100 voted for nil.
@@ -195,8 +188,8 @@ func TestVoteSet_2_3MajorityRedux(t *testing.T) {
 		_, err = signAddVote(privValidators[i], vote, voteSet)
 		require.NoError(t, err)
 	}
-	blockID, ok := voteSet.TwoThirdsMajority()
-	assert.False(t, ok || !blockID.IsZero(),
+	dataHash, ok := voteSet.TwoThirdsMajority()
+	assert.False(t, ok || !dataHash.IsZero(),
 		"there should be no 2/3 majority")
 
 	// 67th validator voted for nil
@@ -207,8 +200,8 @@ func TestVoteSet_2_3MajorityRedux(t *testing.T) {
 		vote := withValidator(voteProto, adrr, 66)
 		_, err = signAddVote(privValidators[66], withBlockHash(vote, nil), voteSet)
 		require.NoError(t, err)
-		blockID, ok = voteSet.TwoThirdsMajority()
-		assert.False(t, ok || !blockID.IsZero(),
+		dataHash, ok = voteSet.TwoThirdsMajority()
+		assert.False(t, ok || !dataHash.IsZero(),
 			"there should be no 2/3 majority: last vote added was nil")
 	}
 
@@ -220,8 +213,8 @@ func TestVoteSet_2_3MajorityRedux(t *testing.T) {
 		vote := withValidator(voteProto, addr, 69)
 		_, err = signAddVote(privValidators[69], withBlockHash(vote, tmrand.Bytes(32)), voteSet)
 		require.NoError(t, err)
-		blockID, ok = voteSet.TwoThirdsMajority()
-		assert.False(t, ok || !blockID.IsZero(),
+		dataHash, ok = voteSet.TwoThirdsMajority()
+		assert.False(t, ok || !dataHash.IsZero(),
 			"there should be no 2/3 majority: last vote added had different BlockHash")
 	}
 
@@ -233,8 +226,8 @@ func TestVoteSet_2_3MajorityRedux(t *testing.T) {
 		vote := withValidator(voteProto, addr, 70)
 		_, err = signAddVote(privValidators[70], vote, voteSet)
 		require.NoError(t, err)
-		blockID, ok = voteSet.TwoThirdsMajority()
-		assert.True(t, ok && blockID.Equals(BlockID{blockHash}),
+		dataHash, ok = voteSet.TwoThirdsMajority()
+		assert.True(t, ok && dataHash.Equals(DataHash{blockHash}),
 			"there should be 2/3 majority")
 	}
 }
@@ -248,11 +241,9 @@ func TestVoteSet_Conflicts(t *testing.T) {
 	voteProto := &Vote{
 		ValidatorAddress: nil,
 		ValidatorIndex:   -1,
-		Height:           height,
-		Round:            round,
 		Timestamp:        tmtime.Now(),
 		Type:             pb.PrevoteType,
-		BlockID:          BlockID{nil},
+		DataHash:         DataHash{nil},
 	}
 
 	val0, err := privValidators[0].GetPubKey()
@@ -277,7 +268,7 @@ func TestVoteSet_Conflicts(t *testing.T) {
 	}
 
 	// start tracking blockHash1
-	err = voteSet.SetPeerMaj23("peerA", BlockID{blockHash1})
+	err = voteSet.SetPeerMaj23("peerA", DataHash{blockHash1})
 	require.NoError(t, err)
 
 	// val0 votes again for blockHash1.
@@ -289,7 +280,7 @@ func TestVoteSet_Conflicts(t *testing.T) {
 	}
 
 	// attempt tracking blockHash2, should fail because already set for peerA.
-	err = voteSet.SetPeerMaj23("peerA", BlockID{blockHash2})
+	err = voteSet.SetPeerMaj23("peerA", DataHash{blockHash2})
 	require.Error(t, err)
 
 	// val0 votes again for blockHash1.
@@ -341,7 +332,7 @@ func TestVoteSet_Conflicts(t *testing.T) {
 	}
 
 	// now attempt tracking blockHash1
-	err = voteSet.SetPeerMaj23("peerB", BlockID{blockHash1})
+	err = voteSet.SetPeerMaj23("peerB", DataHash{blockHash1})
 	require.NoError(t, err)
 
 	// val2 votes for blockHash1.
@@ -359,8 +350,8 @@ func TestVoteSet_Conflicts(t *testing.T) {
 	if !voteSet.HasTwoThirdsMajority() {
 		t.Errorf("we should have 2/3 majority for blockHash1")
 	}
-	blockIDMaj23, _ := voteSet.TwoThirdsMajority()
-	if !bytes.Equal(blockIDMaj23.Hash, blockHash1) {
+	DataHashMaj23, _ := voteSet.TwoThirdsMajority()
+	if !bytes.Equal(DataHashMaj23.Hash, blockHash1) {
 		t.Errorf("got the wrong 2/3 majority blockhash")
 	}
 	if !voteSet.HasTwoThirdsAny() {
@@ -376,11 +367,9 @@ func TestVoteSet_MakeCommit(t *testing.T) {
 	voteProto := &Vote{
 		ValidatorAddress: nil,
 		ValidatorIndex:   -1,
-		Height:           height,
-		Round:            round,
 		Timestamp:        tmtime.Now(),
 		Type:             pb.PrecommitType,
-		BlockID:          BlockID{blockHash},
+		DataHash:         DataHash{blockHash},
 	}
 
 	// 6 out of 10 voted for some block.
@@ -427,7 +416,7 @@ func TestVoteSet_MakeCommit(t *testing.T) {
 		assert.NoError(t, err)
 		addr := pv.Address()
 		vote := withValidator(voteProto, addr, 8)
-		vote.BlockID = BlockID{}
+		vote.DataHash = DataHash{}
 
 		_, err = signAddVote(privValidators[8], vote, voteSet)
 		require.NoError(t, err)
@@ -453,7 +442,7 @@ func randVoteSet(
 	votingPower int64,
 ) (*VoteSet, *ProposerSet, []PrivProposer) {
 	valSet, privValidators := RandValidatorSet(numValidators, votingPower)
-	return NewVoteSet("test_chain_id", height, round, signedMsgType, valSet), valSet, privValidators
+	return NewVoteSet("test_chain_id", signedMsgType, valSet), valSet, privValidators
 }
 
 // Convenience: Return new vote with different validator address/index
@@ -461,20 +450,6 @@ func withValidator(vote *Vote, addr []byte, idx int32) *Vote {
 	vote = vote.Copy()
 	vote.ValidatorAddress = addr
 	vote.ValidatorIndex = idx
-	return vote
-}
-
-// Convenience: Return new vote with different height
-func withHeight(vote *Vote, height int64) *Vote {
-	vote = vote.Copy()
-	vote.Height = height
-	return vote
-}
-
-// Convenience: Return new vote with different round
-func withRound(vote *Vote, round int32) *Vote {
-	vote = vote.Copy()
-	vote.Round = round
 	return vote
 }
 
@@ -488,7 +463,7 @@ func withType(vote *Vote, signedMsgType byte) *Vote {
 // Convenience: Return new vote with different blockHash
 func withBlockHash(vote *Vote, blockHash []byte) *Vote {
 	vote = vote.Copy()
-	vote.BlockID.Hash = blockHash
+	vote.DataHash.Hash = blockHash
 	return vote
 }
 
