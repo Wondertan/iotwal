@@ -1,7 +1,6 @@
 package concord
 
 import (
-	"encoding/json"
 	"fmt"
 	"time"
 
@@ -86,7 +85,7 @@ type RoundState struct {
 
 	// Last known block parts of POL mentioned above.
 	ValidBlockParts           *types.PartSet      `json:"valid_block_parts"`
-	Votes                     *HeightVoteSet      `json:"votes"`
+	// Votes                     *HeightVoteSet      `json:"votes"`
 	CommitRound               int32               `json:"commit_round"` //
 	LastCommit                *types.VoteSet      `json:"last_commit"`  // Last precommits at Height-1
 	LastValidators            *types.ValidatorSet `json:"last_validators"`
@@ -100,16 +99,16 @@ type RoundStateSimple struct {
 	ProposalBlockHash bytes.HexBytes      `json:"proposal_block_hash"`
 	LockedBlockHash   bytes.HexBytes      `json:"locked_block_hash"`
 	ValidBlockHash    bytes.HexBytes      `json:"valid_block_hash"`
-	Votes             json.RawMessage     `json:"height_vote_set"`
+	// Votes             json.RawMessage     `json:"height_vote_set"`
 	Proposer          types.ValidatorInfo `json:"proposer"`
 }
 
 // Compress the RoundState to RoundStateSimple
 func (rs *RoundState) RoundStateSimple() RoundStateSimple {
-	votesJSON, err := rs.Votes.MarshalJSON()
-	if err != nil {
-		panic(err)
-	}
+	// votesJSON, err := rs.Votes.MarshalJSON()
+	// if err != nil {
+	// 	panic(err)
+	// }
 
 	addr := rs.Validators.GetProposer().Address
 	idx, _ := rs.Validators.GetByAddress(addr)
@@ -120,7 +119,7 @@ func (rs *RoundState) RoundStateSimple() RoundStateSimple {
 		ProposalBlockHash: rs.ProposalBlock.Hash(),
 		LockedBlockHash:   rs.LockedBlock.Hash(),
 		ValidBlockHash:    rs.ValidBlock.Hash(),
-		Votes:             votesJSON,
+	//	Votes:             votesJSON,
 		Proposer: types.ValidatorInfo{
 			Address: addr,
 			Index:   idx,
@@ -188,7 +187,6 @@ func (rs *RoundState) StringIndented(indent string) string {
 %s  LockedBlock:   %v %v
 %s  ValidRound:   %v
 %s  ValidBlock:   %v %v
-%s  Votes:         %v
 %s  LastCommit:    %v
 %s  LastValidators:%v
 %s}`,
@@ -202,7 +200,7 @@ func (rs *RoundState) StringIndented(indent string) string {
 		indent, rs.LockedBlockParts.StringShort(), rs.LockedBlock.StringShort(),
 		indent, rs.ValidRound,
 		indent, rs.ValidBlockParts.StringShort(), rs.ValidBlock.StringShort(),
-		indent, rs.Votes.StringIndented(indent+"  "),
+	//	indent, rs.Votes.StringIndented(indent+"  "),
 		indent, rs.LastCommit.StringShort(),
 		indent, rs.LastValidators.StringIndented(indent+"  "),
 		indent)

@@ -66,6 +66,7 @@ type VoteSet struct {
 	maj23         *DataHash              // First 2/3 majority seen
 	votesByBlock  map[string]*blockVotes // string(blockHash|blockParts) -> blockVotes
 	peerMaj23s    map[peer.ID]DataHash   // Maj23 for each peer
+	done chan struct{}
 }
 
 // Constructs a new VoteSet struct used to accumulate votes for given height/round.
@@ -81,7 +82,12 @@ func NewVoteSet(chainID string,
 		maj23:         nil,
 		votesByBlock:  make(map[string]*blockVotes, valSet.Size()),
 		peerMaj23s:    make(map[peer.ID]DataHash),
+		done: make(chan struct{}),
 	}
+}
+
+func (voteSet *VoteSet) Done() <-chan struct{} {
+	return voteSet.done
 }
 
 func (voteSet *VoteSet) ChainID() string {
@@ -183,6 +189,16 @@ func (voteSet *VoteSet) addVote(vote *Vote) (added bool, err error) {
 	}
 	if !added {
 		panic("Expected to add non-conflicting vote")
+	}
+
+	if voteSet.HasTwoThirdsMajority() {
+		select {
+		default:
+			// signal that majority was accumulated
+			close(voteSet.done)
+		case <-voteSet.done:
+			// do nothing, as we already have the majority
+		}
 	}
 	return added, nil
 }

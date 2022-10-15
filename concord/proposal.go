@@ -11,11 +11,6 @@ import (
 	tmtime "github.com/tendermint/tendermint/types/time"
 )
 
-var (
-	ErrInvalidBlockPartSignature = errors.New("error invalid block part signature")
-	ErrInvalidBlockPartHash      = errors.New("error invalid block part hash")
-)
-
 // Proposal defines a block proposal for the consensus.
 // It refers to the block by BlockID field.
 // It must be signed by the correct proposer for the given Height/Round
@@ -28,7 +23,7 @@ type Proposal struct {
 	POLRound  int32     `json:"pol_round"` // -1 if null.
 	Timestamp time.Time `json:"timestamp"`
 	Signature []byte    `json:"signature"`
-	Data      DataHash  `json:"data"`
+	Data      []byte  	`json:"data"`
 }
 
 // NewProposal returns a new Proposal.
@@ -39,7 +34,7 @@ func NewProposal(round int32, polRound int32, data []byte) *Proposal {
 		Round:     round,
 		POLRound:  polRound,
 		Timestamp: tmtime.Now(),
-		Data:      DataHash{data},
+		Data:      data,
 	}
 }
 
@@ -113,7 +108,7 @@ func (p *Proposal) ToProto() *pb.Proposal {
 	pb.Type = p.Type
 	pb.Round = p.Round
 	pb.PolRound = p.POLRound
-	pb.DataHash = p.Data.ToProto()
+	pb.Data = p.Data
 	pb.Timestamp = p.Timestamp
 	pb.Signature = p.Signature
 
@@ -132,7 +127,7 @@ func ProposalFromProto(pp *pb.Proposal) (*Proposal, error) {
 	p.Type = pp.Type
 	p.Round = pp.Round
 	p.POLRound = pp.PolRound
-	p.Data = DataHash{pp.DataHash.Hash}
+	p.Data = pp.Data
 	p.Timestamp = pp.Timestamp
 	p.Signature = pp.Signature
 

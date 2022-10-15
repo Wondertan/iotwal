@@ -28,6 +28,11 @@ type conciliator struct {
 	propSelf  PrivProposer
 }
 
+// TODO:
+//  * Cache for proposals and votes received from the PS. For rounds that hasn't been started on
+//  local instance yet
+//  	* Garbage collect the the cache every like minute
+//      * Limit cache to receive no more than N messages from a concord peer
 type concord struct {
 	id    string
 	topic *pubsub.Topic
@@ -68,13 +73,13 @@ func (c *conciliator) newConcord(id string, pv Validator) (*concord, error) {
 }
 
 // TODO:
-//   - Handle case where we blocked on validation, but majority locked on the block.
-//   - Possible during catching up
 //   - Consider passing ProposerSet as a param
-//   - Implement vote for nil and timeouts
+//   - Implement vote for nil and timeouts and multi round voting
 //   - Introduce another 'session' entity identified by prop hash
 //   - Enables multiple independent agreements
 //   - Fixes potential catching up issues for layers above
+//   - Handle case where our thread is blocked on validation, but majority already locked on the block.
+//   	- Possible during catching up
 func (c *concord) AgreeOn(ctx context.Context, prop []byte) ([]byte, *Commit, error) {
 	c.agreeLk.Lock()
 	defer c.agreeLk.Unlock()
@@ -104,14 +109,11 @@ func (c *concord) AgreeOn(ctx context.Context, prop []byte) ([]byte, *Commit, er
 	if err != nil {
 		return nil, nil, err
 	}
+	// TODO: Check for double signing/equivocation
 	// TODO: Do we need to wait for all the votes or can we send PreCommits right after?
 	votes, err := c.round.Vote(ctx, hash, pb.PrecommitType)
 	if err != nil {
 		return nil, nil, err
-	}
-
-	if votes.signedMsgType != pb.PrecommitType {
-		return nil, nil, ErrVoteInvalidType
 	}
 
 	return prop, votes.MakeCommit(), nil
@@ -151,7 +153,7 @@ func (c *concord) handle(ctx context.Context, pmsg *pubsub.Message) error {
 	case *ProposalMessage:
 		return round.rcvProposal(ctx, msg.Proposal)
 	case *VoteMessage:
-		return round.rcvVote(ctx, msg.Vote, peer.ID(pmsg.From))
+		return round.rcvVote(ctx, msg.Vote)
 	default:
 		return fmt.Errorf("wrong msg type %v", reflect.TypeOf(msg))
 	}
