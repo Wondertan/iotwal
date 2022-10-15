@@ -6,13 +6,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Wondertan/iotwal/concord/pb"
 	"github.com/tendermint/tendermint/crypto"
 	"github.com/tendermint/tendermint/crypto/ed25519"
 	"github.com/tendermint/tendermint/crypto/merkle"
 	"github.com/tendermint/tendermint/libs/bits"
 	tmbytes "github.com/tendermint/tendermint/libs/bytes"
 	tmmath "github.com/tendermint/tendermint/libs/math"
-	"github.com/Wondertan/iotwal/concord/pb"
 )
 
 var (
@@ -27,9 +27,9 @@ var (
 // NOTE: Commit is empty for height 1, but never nil.
 type Commit struct {
 	// NOTE: The signatures are in order of address to preserve the bonded
-	// ValidatorSet order.
+	// ProposerSet order.
 	// Any peer with a block can gossip signatures by index with a peer without
-	// recalculating the active ValidatorSet.
+	// recalculating the active ProposerSet.
 	Height     int64       `json:"height"`
 	Round      int32       `json:"round"`
 	BlockID    BlockID     `json:"block_id"`
@@ -55,7 +55,7 @@ func NewCommit(height int64, round int32, blockID BlockID, commitSigs []CommitSi
 // CommitToVoteSet constructs a VoteSet from the Commit and validator set.
 // Panics if signatures from the commit can't be added to the voteset.
 // Inverse of VoteSet.MakeCommit().
-func CommitToVoteSet(chainID string, commit *Commit, vals *ValidatorSet) *VoteSet {
+func CommitToVoteSet(chainID string, commit *Commit, vals *ProposerSet) *VoteSet {
 	voteSet := NewVoteSet(chainID, commit.Height, commit.Round, pb.PrecommitType, vals)
 	for idx, commitSig := range commit.Signatures {
 		if commitSig.Absent() {

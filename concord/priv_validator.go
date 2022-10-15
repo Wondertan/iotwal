@@ -10,16 +10,16 @@ import (
 	"github.com/tendermint/tendermint/crypto/ed25519"
 )
 
-// PrivValidator defines the functionality of a local Tendermint validator
+// PrivProposer defines the functionality of a local Tendermint validator
 // that signs votes and proposals, and never double signs.
-type PrivValidator interface {
+type PrivProposer interface {
 	GetPubKey() (crypto.PubKey, error)
 
 	SignVote(chainID string, vote *pb.Vote) error
 	SignProposal(chainID string, proposal *pb.Proposal) error
 }
 
-type PrivValidatorsByAddress []PrivValidator
+type PrivValidatorsByAddress []PrivProposer
 
 func (pvs PrivValidatorsByAddress) Len() int {
 	return len(pvs)
@@ -45,7 +45,7 @@ func (pvs PrivValidatorsByAddress) Swap(i, j int) {
 //----------------------------------------
 // MockPV
 
-// MockPV implements PrivValidator without any safety or persistence.
+// MockPV implements PrivProposer without any safety or persistence.
 // Only use it for testing.
 type MockPV struct {
 	PrivKey              crypto.PrivKey
@@ -64,12 +64,12 @@ func NewMockPVWithParams(privKey crypto.PrivKey, breakProposalSigning, breakVote
 	return MockPV{privKey, breakProposalSigning, breakVoteSigning}
 }
 
-// Implements PrivValidator.
+// GetPubKey implements PrivProposer.
 func (pv MockPV) GetPubKey() (crypto.PubKey, error) {
 	return pv.PrivKey.PubKey(), nil
 }
 
-// Implements PrivValidator.
+// SignVote implements PrivProposer.
 func (pv MockPV) SignVote(chainID string, vote *pb.Vote) error {
 	useChainID := chainID
 	if pv.breakVoteSigning {
@@ -85,7 +85,7 @@ func (pv MockPV) SignVote(chainID string, vote *pb.Vote) error {
 	return nil
 }
 
-// Implements PrivValidator.
+// SignProposal implements PrivProposer.
 func (pv MockPV) SignProposal(chainID string, proposal *pb.Proposal) error {
 	useChainID := chainID
 	if pv.breakProposalSigning {
@@ -101,9 +101,9 @@ func (pv MockPV) SignProposal(chainID string, proposal *pb.Proposal) error {
 	return nil
 }
 
-func (pv MockPV) ExtractIntoValidator(votingPower int64) *Validator {
+func (pv MockPV) ExtractIntoValidator(votingPower int64) *Proposer {
 	pubKey, _ := pv.GetPubKey()
-	return &Validator{
+	return &Proposer{
 		Address:     pubKey.Address(),
 		PubKey:      pubKey,
 		VotingPower: votingPower,
@@ -128,12 +128,10 @@ type ErroringMockPV struct {
 
 var ErroringMockPVErr = errors.New("erroringMockPV always returns an error")
 
-// Implements PrivValidator.
 func (pv *ErroringMockPV) SignVote(chainID string, vote *pb.Vote) error {
 	return ErroringMockPVErr
 }
 
-// Implements PrivValidator.
 func (pv *ErroringMockPV) SignProposal(chainID string, proposal *pb.Proposal) error {
 	return ErroringMockPVErr
 }

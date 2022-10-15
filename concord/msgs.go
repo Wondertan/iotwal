@@ -14,6 +14,7 @@ import (
 
 // Message is a message that can be sent and received on the Reactor
 type Message interface {
+	Round() int
 	ValidateBasic() error
 }
 
@@ -122,6 +123,10 @@ type ProposalMessage struct {
 	Proposal *Proposal
 }
 
+func (m *ProposalMessage) Round() int {
+	return int(m.Proposal.Round)
+}
+
 // ValidateBasic performs basic validation.
 func (m *ProposalMessage) ValidateBasic() error {
 	return m.Proposal.ValidateBasic()
@@ -172,6 +177,10 @@ type VoteMessage struct {
 // ValidateBasic performs basic validation.
 func (m *VoteMessage) ValidateBasic() error {
 	return m.Vote.ValidateBasic()
+}
+
+func (m *VoteMessage) Round() int {
+	return int(m.Vote.Round)
 }
 
 // String returns a string representation.

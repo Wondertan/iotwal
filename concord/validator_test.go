@@ -11,12 +11,12 @@ func TestValidatorProtoBuf(t *testing.T) {
 	val, _ := RandValidator(true, 100)
 	testCases := []struct {
 		msg      string
-		v1       *Validator
+		v1       *Proposer
 		expPass1 bool
 		expPass2 bool
 	}{
 		{"success validator", val, true, true},
-		{"failure empty", &Validator{}, false, false},
+		{"failure empty", &Proposer{}, false, false},
 		{"failure nil", nil, false, false},
 	}
 	for _, tc := range testCases {
@@ -42,7 +42,7 @@ func TestValidatorValidateBasic(t *testing.T) {
 	priv := NewMockPV()
 	pubKey, _ := priv.GetPubKey()
 	testCases := []struct {
-		val *Validator
+		val *Proposer
 		err bool
 		msg string
 	}{
@@ -57,7 +57,7 @@ func TestValidatorValidateBasic(t *testing.T) {
 			msg: "nil validator",
 		},
 		{
-			val: &Validator{
+			val: &Proposer{
 				PubKey: nil,
 			},
 			err: true,
@@ -69,7 +69,7 @@ func TestValidatorValidateBasic(t *testing.T) {
 			msg: "validator has negative voting power",
 		},
 		{
-			val: &Validator{
+			val: &Proposer{
 				PubKey:  pubKey,
 				Address: nil,
 			},
@@ -77,7 +77,7 @@ func TestValidatorValidateBasic(t *testing.T) {
 			msg: "validator address is the wrong size: ",
 		},
 		{
-			val: &Validator{
+			val: &Proposer{
 				PubKey:  pubKey,
 				Address: []byte{'a'},
 			},

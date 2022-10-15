@@ -63,7 +63,7 @@ type VoteSet struct {
 	height        int64
 	round         int32
 	signedMsgType pb.SignedMsgType
-	valSet        *ValidatorSet
+	valSet        *ProposerSet
 
 	mtx           tmsync.Mutex
 	votesBitArray *bits.BitArray
@@ -76,7 +76,7 @@ type VoteSet struct {
 
 // Constructs a new VoteSet struct used to accumulate votes for given height/round.
 func NewVoteSet(chainID string, height int64, round int32,
-	signedMsgType pb.SignedMsgType, valSet *ValidatorSet) *VoteSet {
+	signedMsgType pb.SignedMsgType, valSet *ProposerSet) *VoteSet {
 	if height == 0 {
 		panic("Cannot make VoteSet for height == 0, doesn't make sense.")
 	}

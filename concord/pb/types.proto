@@ -119,11 +119,10 @@ message CommitSig {
 
 message Proposal {
   SignedMsgType             type      = 1;
-  int64                     height    = 2;
-  int32                     round     = 3;
-  int32                     pol_round = 4;
-  BlockID                   block_id  = 5 [(gogoproto.customname) = "BlockID", (gogoproto.nullable) = false];
-  google.protobuf.Timestamp timestamp = 6
+  int32                     round     = 2;
+  int32                     pol_round = 3;
+  bytes                     data      = 4;
+  google.protobuf.Timestamp timestamp = 5
       [(gogoproto.nullable) = false, (gogoproto.stdtime) = true];
-  bytes signature = 7;
+  bytes signature = 6;
 }

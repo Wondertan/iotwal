@@ -451,7 +451,7 @@ func randVoteSet(
 	signedMsgType pb.SignedMsgType,
 	numValidators int,
 	votingPower int64,
-) (*VoteSet, *ValidatorSet, []PrivValidator) {
+) (*VoteSet, *ProposerSet, []PrivProposer) {
 	valSet, privValidators := RandValidatorSet(numValidators, votingPower)
 	return NewVoteSet("test_chain_id", height, round, signedMsgType, valSet), valSet, privValidators
 }

@@ -37,7 +37,7 @@ func TestMsgToProto(t *testing.T) {
 	val := NewValidator(pk, 100)
 
 	vote, err := MakeVote(
-		1, BlockID{}, &ValidatorSet{Proposer: val, Validators: []*Validator{val}},
+		1, BlockID{}, &ProposerSet{Proposer: val, Proposers: []*Proposer{val}},
 		pv, "chainID", time.Now())
 	require.NoError(t, err)
 	pbVote := vote.ToProto()

@@ -8,7 +8,7 @@ import (
 )
 
 func MakeCommit(blockID BlockID, height int64, round int32,
-	voteSet *VoteSet, validators []PrivValidator, now time.Time) (*Commit, error) {
+	voteSet *VoteSet, validators []PrivProposer, now time.Time) (*Commit, error) {
 
 	// all sign
 	for i := 0; i < len(validators); i++ {
@@ -35,7 +35,7 @@ func MakeCommit(blockID BlockID, height int64, round int32,
 	return voteSet.MakeCommit(), nil
 }
 
-func signAddVote(privVal PrivValidator, vote *Vote, voteSet *VoteSet) (signed bool, err error) {
+func signAddVote(privVal PrivProposer, vote *Vote, voteSet *VoteSet) (signed bool, err error) {
 	v := vote.ToProto()
 	err = privVal.SignVote(voteSet.ChainID(), v)
 	if err != nil {
@@ -48,8 +48,8 @@ func signAddVote(privVal PrivValidator, vote *Vote, voteSet *VoteSet) (signed bo
 func MakeVote(
 	height int64,
 	blockID BlockID,
-	valSet *ValidatorSet,
-	privVal PrivValidator,
+	valSet *ProposerSet,
+	privVal PrivProposer,
 	chainID string,
 	now time.Time,
 ) (*Vote, error) {

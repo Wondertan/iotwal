@@ -6,10 +6,11 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/Wondertan/iotwal/concord/pb"
 	"github.com/tendermint/tendermint/crypto"
 	tmbytes "github.com/tendermint/tendermint/libs/bytes"
 	"github.com/tendermint/tendermint/libs/protoio"
+
+	"github.com/Wondertan/iotwal/concord/pb"
 )
 
 const (
@@ -49,13 +50,17 @@ type Address = crypto.Address
 // consensus.
 type Vote struct {
 	Type             pb.SignedMsgType `json:"type"`
-	Height           int64                 `json:"height"`
-	Round            int32                 `json:"round"`    // assume there will not be greater than 2_147_483_647 rounds
-	BlockID          BlockID               `json:"block_id"` // zero if vote is nil.
-	Timestamp        time.Time             `json:"timestamp"`
-	ValidatorAddress Address               `json:"validator_address"`
-	ValidatorIndex   int32                 `json:"validator_index"`
-	Signature        []byte                `json:"signature"`
+	Height           int64            `json:"height"`
+	Round            int32            `json:"round"`    // assume there will not be greater than 2_147_483_647 rounds
+	BlockID          BlockID          `json:"block_id"` // zero if vote is nil.
+	Timestamp        time.Time        `json:"timestamp"`
+	ValidatorAddress Address          `json:"validator_address"`
+	ValidatorIndex   int32            `json:"validator_index"`
+	Signature        []byte           `json:"signature"`
+}
+
+func NewVote(t pb.SignedMsgType, round int32, blockID *BlockID) *Vote {
+	return &Vote{Type: t, Round: round, BlockID: *blockID, Timestamp: time.Now()}
 }
 
 // CommitSig converts the Vote to a CommitSig.
@@ -254,4 +259,3 @@ func IsVoteTypeValid(t pb.SignedMsgType) bool {
 		return false
 	}
 }
-
