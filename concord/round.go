@@ -5,7 +5,6 @@ import (
 	"context"
 	"errors"
 
-	"github.com/libp2p/go-libp2p-core/peer"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/tendermint/tendermint/crypto"
 	tmbytes "github.com/tendermint/tendermint/libs/bytes"
@@ -25,10 +24,8 @@ type round struct {
 	valInfo   *propInfo
 
 	round   int32
-	voteSet *HeightVoteSet // TODO: Instanitiate and reduce to VoteSets
-
-	propCh  chan DataHash
-	maj23Dn map[pb.SignedMsgType]chan struct{}
+	propCh chan DataHash
+	votes  map[pb.SignedMsgType]*VoteSet
 }
 
 func newRound(r int, concordId string, topic *pubsub.Topic, info *propInfo) *round {
@@ -38,9 +35,9 @@ func newRound(r int, concordId string, topic *pubsub.Topic, info *propInfo) *rou
 		valInfo:   info,
 		round:     int32(r),
 		propCh:    make(chan DataHash),
-		maj23Dn: map[pb.SignedMsgType]chan struct{}{
-			pb.PrevoteType:   make(chan struct{}),
-			pb.PrecommitType: make(chan struct{}),
+		votes: map[pb.SignedMsgType]*VoteSet{
+			pb.PrevoteType:   NewVoteSet(concordId, pb.PrevoteType, info.set),
+			pb.PrecommitType: NewVoteSet(concordId, pb.PrecommitType, info.set),
 		},
 	}
 }
@@ -103,8 +100,8 @@ func (r *round) Vote(ctx context.Context, hash tmbytes.HexBytes, voteType pb.Sig
 	}
 
 	select {
-	case <-r.maj23Dn[voteType]:
-		return r.voteSet.VoteSet(voteType), nil
+	case <-r.votes[voteType].Done():
+		return r.votes[voteType], nil
 	case <-ctx.Done():
 		return nil, ctx.Err()
 	}
@@ -122,21 +119,10 @@ func (r *round) vote(ctx context.Context, hash tmbytes.HexBytes, msgType pb.Sign
 	return r.publish(ctx, &VoteMessage{Vote: vote})
 }
 
-func (r *round) rcvVote(_ context.Context, v *Vote, from peer.ID) error {
+func (r *round) rcvVote(_ context.Context, v *Vote) error {
 	// adds the vote and does all the necessary verifications
-	ok, err := r.voteSet.AddVote(v)
-	if !ok || err != nil {
-		return err
-	}
-
-	set := r.voteSet.VoteSet(v.Type)
-	if !set.HasTwoThirdsMajority() {
-		// need to wait more
-		return nil
-	}
-
-	close(r.maj23Dn[v.Type])
-	return nil
+	_, err := r.votes[v.Type].AddVote(v)
+	return err
 }
 
 func (r *round) publish(ctx context.Context, message Message) error {
