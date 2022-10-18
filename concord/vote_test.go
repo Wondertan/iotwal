@@ -8,11 +8,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/Wondertan/iotwal/concord/pb"
 	"github.com/tendermint/tendermint/crypto"
 	"github.com/tendermint/tendermint/crypto/ed25519"
 	"github.com/tendermint/tendermint/crypto/tmhash"
 	"github.com/tendermint/tendermint/libs/protoio"
+
+	"github.com/Wondertan/iotwal/concord/pb"
 )
 
 func examplePrevote() *Vote {
@@ -24,7 +25,7 @@ func examplePrecommit() *Vote {
 }
 
 func exampleVote(t byte) *Vote {
-	var stamp, err = time.Parse(TimeFormat, "2017-12-25T03:00:01.234Z")
+	var stamp, err = time.Parse(RFC3339Nano, "2017-12-25T03:00:01.234Z")
 	if err != nil {
 		panic(err)
 	}
@@ -37,15 +38,15 @@ func exampleVote(t byte) *Vote {
 		},
 		ValidatorAddress: crypto.AddressHash([]byte("validator_address")),
 		ValidatorIndex:   56789,
+		ChainID:          "test_chain_ID",
 	}
 }
 
 func TestVoteSignable(t *testing.T) {
 	vote := examplePrecommit()
 	v := vote.ToProto()
-	signBytes := VoteSignBytes("test_chain_id", v)
-	pb := CanonicalizeVote("test_chain_id", v)
-	expected, err := protoio.MarshalDelimited(&pb)
+	signBytes := VoteSignBytes(v)
+	expected, err := protoio.MarshalDelimited(v)
 	require.NoError(t, err)
 
 	require.Equal(t, expected, signBytes, "Got unexpected sign bytes for Vote.")
@@ -54,18 +55,17 @@ func TestVoteSignable(t *testing.T) {
 func TestVoteSignBytesTestVectors(t *testing.T) {
 
 	tests := []struct {
-		chainID string
-		vote    *Vote
-		want    []byte
+		vote *Vote
+		want []byte
 	}{
 		0: {
-			"", &Vote{},
+			&Vote{},
 			// NOTE: Height and Round are skipped here. This case needs to be considered while parsing.
 			[]byte{0xd, 0x2a, 0xb, 0x8, 0x80, 0x92, 0xb8, 0xc3, 0x98, 0xfe, 0xff, 0xff, 0xff, 0x1},
 		},
 		// with proper (fixed size) height and round (PreCommit):
 		1: {
-			"", &Vote{Type: pb.PrecommitType},
+			&Vote{Type: pb.PrecommitType, ChainID: ""},
 			[]byte{
 				0x21,                                   // length
 				0x8,                                    // (field_number << 3) | wire_type
@@ -80,7 +80,7 @@ func TestVoteSignBytesTestVectors(t *testing.T) {
 		},
 		// with proper (fixed size) height and round (PreVote):
 		2: {
-			"", &Vote{Type: pb.PrevoteType},
+			&Vote{Type: pb.PrevoteType, ChainID: ""},
 			[]byte{
 				0x21,                                   // length
 				0x8,                                    // (field_number << 3) | wire_type
@@ -96,20 +96,10 @@ func TestVoteSignBytesTestVectors(t *testing.T) {
 	}
 	for i, tc := range tests {
 		v := tc.vote.ToProto()
-		got := VoteSignBytes(tc.chainID, v)
+		got := VoteSignBytes(v)
 		assert.Equal(t, len(tc.want), len(got), "test case #%v: got unexpected sign bytes length for Vote.", i)
 		assert.Equal(t, tc.want, got, "test case #%v: got unexpected sign bytes for Vote.", i)
 	}
-}
-
-func TestVoteProposalNotEq(t *testing.T) {
-	cv := CanonicalizeVote("", &pb.Vote{Height: 1, Round: 1})
-	p := CanonicalizeProposal("", &pb.Proposal{Round: 1})
-	vb, err := proto.Marshal(&cv)
-	require.NoError(t, err)
-	pb, err := proto.Marshal(&p)
-	require.NoError(t, err)
-	require.NotEqual(t, vb, pb)
 }
 
 func TestVoteVerifySignature(t *testing.T) {
@@ -119,14 +109,14 @@ func TestVoteVerifySignature(t *testing.T) {
 
 	vote := examplePrecommit()
 	v := vote.ToProto()
-	signBytes := VoteSignBytes("test_chain_id", v)
+	signBytes := VoteSignBytes(v)
 
 	// sign it
 	err = privVal.SignVote("test_chain_id", v)
 	require.NoError(t, err)
 
 	// verify the same vote
-	valid := pubkey.VerifySignature(VoteSignBytes("test_chain_id", v), v.Signature)
+	valid := pubkey.VerifySignature(VoteSignBytes(v), v.Signature)
 	require.True(t, valid)
 
 	// serialize, deserialize and verify again....
@@ -137,7 +127,7 @@ func TestVoteVerifySignature(t *testing.T) {
 	require.NoError(t, err)
 
 	// verify the transmitted vote
-	newSignBytes := VoteSignBytes("test_chain_id", precommit)
+	newSignBytes := VoteSignBytes(precommit)
 	require.Equal(t, string(signBytes), string(newSignBytes))
 	valid = pubkey.VerifySignature(newSignBytes, precommit.Signature)
 	require.True(t, valid)
@@ -172,12 +162,12 @@ func TestVoteVerify(t *testing.T) {
 	vote := examplePrevote()
 	vote.ValidatorAddress = pubkey.Address()
 
-	err = vote.Verify("test_chain_id", ed25519.GenPrivKey().PubKey())
+	err = vote.Verify(ed25519.GenPrivKey().PubKey())
 	if assert.Error(t, err) {
 		assert.Equal(t, ErrVoteInvalidValidatorAddress, err)
 	}
 
-	err = vote.Verify("test_chain_id", pubkey)
+	err = vote.Verify(pubkey)
 	if assert.Error(t, err) {
 		assert.Equal(t, ErrVoteInvalidSignature, err)
 	}

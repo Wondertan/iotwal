@@ -91,7 +91,7 @@ func (commit *Commit) GetVote(valIdx int32) *Vote {
 // See VoteSignBytes
 func (commit *Commit) VoteSignBytes(chainID string, valIdx int32) []byte {
 	v := commit.GetVote(valIdx).ToProto()
-	return VoteSignBytes(chainID, v)
+	return VoteSignBytes(v)
 }
 
 // Type returns the vote type of the commit, which is always VoteTypePrecommit

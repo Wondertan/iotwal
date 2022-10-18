@@ -23,7 +23,7 @@ type round struct {
 	topic     *pubsub.Topic
 	valInfo   *propInfo
 
-	round   int32
+	round  int32
 	propCh chan []byte
 	votes  map[pb.SignedMsgType]*VoteSet
 }
@@ -61,7 +61,7 @@ func (r *round) Propose(ctx context.Context, data []byte) ([]byte, error) {
 }
 
 func (r *round) propose(ctx context.Context, data []byte) error {
-	prop := NewProposal(r.round, r.round, data)
+	prop := NewProposal(r.round, r.round, data, r.concordId)
 	pprop := prop.ToProto()
 
 	err := r.valInfo.self.SignProposal(r.concordId, pprop)
@@ -80,7 +80,7 @@ func (r *round) isProposer() bool {
 func (r *round) rcvProposal(ctx context.Context, prop *Proposal) error {
 	// TODO Verify POLRound
 	proper := r.valInfo.set.GetProposer().PubKey
-	if !proper.VerifySignature(ProposalSignBytes(r.concordId, prop.ToProto()), prop.Signature) {
+	if !proper.VerifySignature(ProposalSignBytes(prop.ToProto()), prop.Signature) {
 		return ErrProposalSignature
 	}
 
@@ -108,7 +108,7 @@ func (r *round) Vote(ctx context.Context, hash tmbytes.HexBytes, voteType pb.Sig
 }
 
 func (r *round) vote(ctx context.Context, hash tmbytes.HexBytes, msgType pb.SignedMsgType) error {
-	vote := NewVote(msgType, r.round, &DataHash{Hash: hash})
+	vote := NewVote(msgType, r.concordId, &DataHash{Hash: hash})
 	proto := vote.ToProto()
 	err := r.valInfo.self.SignVote(r.concordId, proto)
 	if err != nil {

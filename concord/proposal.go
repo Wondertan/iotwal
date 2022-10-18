@@ -5,10 +5,11 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/Wondertan/iotwal/concord/pb"
 	tmbytes "github.com/tendermint/tendermint/libs/bytes"
 	"github.com/tendermint/tendermint/libs/protoio"
 	tmtime "github.com/tendermint/tendermint/types/time"
+
+	"github.com/Wondertan/iotwal/concord/pb"
 )
 
 // Proposal defines a block proposal for the consensus.
@@ -23,18 +24,20 @@ type Proposal struct {
 	POLRound  int32     `json:"pol_round"` // -1 if null.
 	Timestamp time.Time `json:"timestamp"`
 	Signature []byte    `json:"signature"`
-	Data      []byte  	`json:"data"`
+	Data      []byte    `json:"data"`
+	ChainID   string
 }
 
 // NewProposal returns a new Proposal.
 // If there is no POLRound, polRound should be -1.
-func NewProposal(round int32, polRound int32, data []byte) *Proposal {
+func NewProposal(round int32, polRound int32, data []byte, chainID string) *Proposal {
 	return &Proposal{
 		Type:      pb.ProposalType,
 		Round:     round,
 		POLRound:  polRound,
 		Timestamp: tmtime.Now(),
 		Data:      data,
+		ChainID:   chainID,
 	}
 }
 
@@ -80,7 +83,7 @@ func (p *Proposal) String() string {
 		CanonicalTime(p.Timestamp))
 }
 
-// ProposalSignBytes returns the proto-encoding of the canonicalized Proposal,
+// ProposalSignBytes returns the proto-encoding of the Proposal,
 // for signing. Panics if the marshaling fails.
 //
 // The encoded Protobuf message is varint length-prefixed (using MarshalDelimited)
@@ -88,9 +91,8 @@ func (p *Proposal) String() string {
 // devices that rely on this encoding.
 //
 // See CanonicalizeProposal
-func ProposalSignBytes(chainID string, p *pb.Proposal) []byte {
-	pb := CanonicalizeProposal(chainID, p)
-	bz, err := protoio.MarshalDelimited(&pb)
+func ProposalSignBytes(pb *pb.Proposal) []byte {
+	bz, err := protoio.MarshalDelimited(pb)
 	if err != nil {
 		panic(err)
 	}
@@ -111,6 +113,7 @@ func (p *Proposal) ToProto() *pb.Proposal {
 	pb.Data = p.Data
 	pb.Timestamp = p.Timestamp
 	pb.Signature = p.Signature
+	pb.ChainID = p.ChainID
 
 	return pb
 }
@@ -130,6 +133,7 @@ func ProposalFromProto(pp *pb.Proposal) (*Proposal, error) {
 	p.Data = pp.Data
 	p.Timestamp = pp.Timestamp
 	p.Signature = pp.Signature
+	p.ChainID = pp.ChainID
 
 	return p, p.ValidateBasic()
 }

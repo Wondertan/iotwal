@@ -681,14 +681,15 @@ func TestValidatorSet_VerifyCommit_All(t *testing.T) {
 	vote := examplePrecommit()
 	vote.ValidatorAddress = pubKey.Address()
 	v := vote.ToProto()
-	sig, err := privKey.Sign(VoteSignBytes(chainID, v))
+	sig, err := privKey.Sign(VoteSignBytes(v))
 	require.NoError(t, err)
 	vote.Signature = sig
 
 	commit := NewCommit(vote.DataHash, []CommitSig{vote.CommitSig()})
 
 	vote2 := *vote
-	sig2, err := privKey.Sign(VoteSignBytes("EpsilonEridani", v))
+	vote2.ChainID = "EpsilonEridani"
+	sig2, err := privKey.Sign(VoteSignBytes(v))
 	require.NoError(t, err)
 	vote2.Signature = sig2
 

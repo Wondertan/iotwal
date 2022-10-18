@@ -56,10 +56,11 @@ type Vote struct {
 	ValidatorAddress Address          `json:"validator_address"`
 	ValidatorIndex   int32            `json:"validator_index"`
 	Signature        []byte           `json:"signature"`
+	ChainID          string           `json:"chainID"`
 }
 
-func NewVote(t pb.SignedMsgType, round int32, dataHash *DataHash) *Vote {
-	return &Vote{Type: t, DataHash: *dataHash, Timestamp: time.Now()}
+func NewVote(t pb.SignedMsgType, chainID string, dataHash *DataHash) *Vote {
+	return &Vote{Type: t, DataHash: *dataHash, Timestamp: time.Now(), ChainID: chainID}
 }
 
 // CommitSig converts the Vote to a CommitSig.
@@ -94,13 +95,11 @@ func (vote *Vote) CommitSig() CommitSig {
 // devices that rely on this encoding.
 //
 // See CanonicalizeVote
-func VoteSignBytes(chainID string, vote *pb.Vote) []byte {
-	pb := CanonicalizeVote(chainID, vote)
-	bz, err := protoio.MarshalDelimited(&pb)
+func VoteSignBytes(vote *pb.Vote) []byte {
+	bz, err := protoio.MarshalDelimited(vote)
 	if err != nil {
 		panic(err)
 	}
-
 	return bz
 }
 
@@ -146,12 +145,12 @@ func (vote *Vote) String() string {
 	)
 }
 
-func (vote *Vote) Verify(chainID string, pubKey crypto.PubKey) error {
+func (vote *Vote) Verify(pubKey crypto.PubKey) error {
 	if !bytes.Equal(pubKey.Address(), vote.ValidatorAddress) {
 		return ErrVoteInvalidValidatorAddress
 	}
 	v := vote.ToProto()
-	if !pubKey.VerifySignature(VoteSignBytes(chainID, v), vote.Signature) {
+	if !pubKey.VerifySignature(VoteSignBytes(v), vote.Signature) {
 		return ErrVoteInvalidSignature
 	}
 	return nil

@@ -8,10 +8,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/Wondertan/iotwal/concord/pb"
 	"github.com/tendermint/tendermint/crypto/tmhash"
-	"github.com/tendermint/tendermint/libs/protoio"
 	tmrand "github.com/tendermint/tendermint/libs/rand"
+
+	"github.com/Wondertan/iotwal/concord/pb"
 )
 
 var (
@@ -20,26 +20,16 @@ var (
 )
 
 func init() {
-	var stamp, err = time.Parse(TimeFormat, "2018-02-11T07:09:22.765Z")
+	var stamp, err = time.Parse(RFC3339Nano, "2018-02-11T07:09:22.765Z")
 	if err != nil {
 		panic(err)
 	}
 	testProposal = &Proposal{
-		Data:      DataHash{Hash: []byte("--June_15_2020_amino_was_removed")},
+		Data:      []byte("--June_15_2020_amino_was_removed"),
 		POLRound:  -1,
 		Timestamp: stamp,
 	}
 	pbp = testProposal.ToProto()
-}
-
-func TestProposalSignable(t *testing.T) {
-	chainID := "test_chain_id"
-	signBytes := ProposalSignBytes(chainID, pbp)
-	pb := CanonicalizeProposal(chainID, pbp)
-
-	expected, err := protoio.MarshalDelimited(&pb)
-	require.NoError(t, err)
-	require.Equal(t, expected, signBytes, "Got unexpected sign bytes for Proposal")
 }
 
 func TestProposalString(t *testing.T) {
@@ -58,9 +48,9 @@ func TestProposalVerifySignature(t *testing.T) {
 
 	prop := NewProposal(
 		2, 2,
-		tmrand.Bytes(tmhash.Size))
+		tmrand.Bytes(tmhash.Size), "test_chain_id")
 	p := prop.ToProto()
-	signBytes := ProposalSignBytes("test_chain_id", p)
+	signBytes := ProposalSignBytes(p)
 
 	// sign it
 	err = privVal.SignProposal("test_chain_id", p)
@@ -85,7 +75,7 @@ func TestProposalVerifySignature(t *testing.T) {
 	require.NoError(t, err)
 
 	// verify the transmitted proposal
-	newSignBytes := ProposalSignBytes("test_chain_id", pb)
+	newSignBytes := ProposalSignBytes(pb)
 	require.Equal(t, string(signBytes), string(newSignBytes))
 	valid = pubKey.VerifySignature(newSignBytes, np.Signature)
 	require.True(t, valid)
@@ -93,7 +83,7 @@ func TestProposalVerifySignature(t *testing.T) {
 
 func BenchmarkProposalWriteSignBytes(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		ProposalSignBytes("test_chain_id", pbp)
+		ProposalSignBytes(pbp)
 	}
 }
 
@@ -115,12 +105,12 @@ func BenchmarkProposalVerifySignature(b *testing.B) {
 	require.NoError(b, err)
 
 	for i := 0; i < b.N; i++ {
-		pubKey.VerifySignature(ProposalSignBytes("test_chain_id", pbp), testProposal.Signature)
+		pubKey.VerifySignature(ProposalSignBytes(pbp), testProposal.Signature)
 	}
 }
 
 func TestProposalValidateBasic(t *testing.T) {
-
+	chainID := "testChainID"
 	privVal := NewMockPV()
 	testCases := []struct {
 		testName         string
@@ -132,7 +122,7 @@ func TestProposalValidateBasic(t *testing.T) {
 		{"Invalid Round", func(p *Proposal) { p.Round = -1 }, true},
 		{"Invalid POLRound", func(p *Proposal) { p.POLRound = -2 }, true},
 		{"Invalid DataHash", func(p *Proposal) {
-			p.Data = DataHash{[]byte{1, 2, 3}}
+			p.Data = []byte{1, 2, 3}
 		}, true},
 		{"Invalid Signature", func(p *Proposal) {
 			p.Signature = make([]byte, 0)
@@ -148,7 +138,7 @@ func TestProposalValidateBasic(t *testing.T) {
 		t.Run(tc.testName, func(t *testing.T) {
 			prop := NewProposal(
 				4, 2,
-				dataHash.Hash)
+				dataHash.Hash, chainID)
 			p := prop.ToProto()
 			err := privVal.SignProposal("test_chain_id", p)
 			prop.Signature = p.Signature
@@ -160,9 +150,9 @@ func TestProposalValidateBasic(t *testing.T) {
 }
 
 func TestProposalProtoBuf(t *testing.T) {
-	proposal := NewProposal(1, 2, makeDataHash([]byte("hash"), []byte("part_set_hash")).Hash)
+	proposal := NewProposal(1, 2, makeDataHash([]byte("hash"), []byte("part_set_hash")).Hash, "test_chain_id")
 	proposal.Signature = []byte("sig")
-	proposal2 := NewProposal(1, 2, nil)
+	proposal2 := NewProposal(1, 2, nil, "test_chain_id")
 
 	testCases := []struct {
 		msg     string

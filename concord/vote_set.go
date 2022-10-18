@@ -66,7 +66,7 @@ type VoteSet struct {
 	maj23         *DataHash              // First 2/3 majority seen
 	votesByBlock  map[string]*blockVotes // string(blockHash|blockParts) -> blockVotes
 	peerMaj23s    map[peer.ID]DataHash   // Maj23 for each peer
-	done chan struct{}
+	done          chan struct{}
 }
 
 // Constructs a new VoteSet struct used to accumulate votes for given height/round.
@@ -82,7 +82,7 @@ func NewVoteSet(chainID string,
 		maj23:         nil,
 		votesByBlock:  make(map[string]*blockVotes, valSet.Size()),
 		peerMaj23s:    make(map[peer.ID]DataHash),
-		done: make(chan struct{}),
+		done:          make(chan struct{}),
 	}
 }
 
@@ -178,7 +178,7 @@ func (voteSet *VoteSet) addVote(vote *Vote) (added bool, err error) {
 	}
 
 	// Check signature.
-	if err := vote.Verify(voteSet.chainID, val.PubKey); err != nil {
+	if err := vote.Verify(val.PubKey); err != nil {
 		return false, fmt.Errorf("failed to verify vote with ChainID %s and PubKey %s: %w", voteSet.chainID, val.PubKey, err)
 	}
 
