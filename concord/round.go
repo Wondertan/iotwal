@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 
+	"github.com/gogo/protobuf/proto"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/tendermint/tendermint/crypto"
 	tmbytes "github.com/tendermint/tendermint/libs/bytes"
@@ -13,9 +14,10 @@ import (
 )
 
 type propInfo struct {
-	set    *ProposerSet
-	self   PrivProposer
-	selfPK crypto.PubKey
+	set       *ProposerSet
+	self      PrivProposer
+	selfIndex int32
+	selfPK    crypto.PubKey
 }
 
 type round struct {
@@ -23,7 +25,7 @@ type round struct {
 	topic     *pubsub.Topic
 	valInfo   *propInfo
 
-	round   int32
+	round  int32
 	propCh chan []byte
 	votes  map[pb.SignedMsgType]*VoteSet
 }
@@ -34,7 +36,7 @@ func newRound(r int, concordId string, topic *pubsub.Topic, info *propInfo) *rou
 		topic:     topic,
 		valInfo:   info,
 		round:     int32(r),
-		propCh:    make(chan []byte),
+		propCh:    make(chan []byte, 1),
 		votes: map[pb.SignedMsgType]*VoteSet{
 			pb.PrevoteType:   NewVoteSet(concordId, pb.PrevoteType, info.set),
 			pb.PrecommitType: NewVoteSet(concordId, pb.PrecommitType, info.set),
@@ -63,14 +65,12 @@ func (r *round) Propose(ctx context.Context, data []byte) ([]byte, error) {
 func (r *round) propose(ctx context.Context, data []byte) error {
 	prop := NewProposal(r.round, r.round, data)
 	pprop := prop.ToProto()
-
 	err := r.valInfo.self.SignProposal(r.concordId, pprop)
 	if err != nil {
 		return err
 	}
-	prop.Signature = pprop.Signature
 
-	return r.publish(ctx, &ProposalMessage{Proposal: prop})
+	return r.publish(ctx, pprop)
 }
 
 func (r *round) isProposer() bool {
@@ -108,15 +108,14 @@ func (r *round) Vote(ctx context.Context, hash tmbytes.HexBytes, voteType pb.Sig
 }
 
 func (r *round) vote(ctx context.Context, hash tmbytes.HexBytes, msgType pb.SignedMsgType) error {
-	vote := NewVote(msgType, r.round, &DataHash{Hash: hash})
+	vote := NewVote(msgType, r.round, r.valInfo.selfIndex, r.valInfo.selfPK.Address(), &DataHash{Hash: hash})
 	proto := vote.ToProto()
 	err := r.valInfo.self.SignVote(r.concordId, proto)
 	if err != nil {
 		return err
 	}
-	vote.Signature = proto.Signature
 
-	return r.publish(ctx, &VoteMessage{Vote: vote})
+	return r.publish(ctx, proto)
 }
 
 func (r *round) rcvVote(_ context.Context, v *Vote) error {
@@ -125,17 +124,12 @@ func (r *round) rcvVote(_ context.Context, v *Vote) error {
 	return err
 }
 
-func (r *round) publish(ctx context.Context, message Message) error {
-	proto, err := MsgToProto(message)
+// rework publish to receive pb.Message
+func (r *round) publish(ctx context.Context, message proto.Message) error {
+	bin, err := encodeMsg(message)
 	if err != nil {
 		return err
 	}
-
-	bin, err := proto.Marshal()
-	if err != nil {
-		return err
-	}
-
 	return r.topic.Publish(ctx, bin)
 }
 

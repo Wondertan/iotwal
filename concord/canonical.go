@@ -37,7 +37,7 @@ func CanonicalizeDataHash(bid *pb.DataHash) *pb.CanonicalDataHash {
 func CanonicalizeProposal(chainID string, proposal *pb.Proposal) pb.CanonicalProposal {
 	return pb.CanonicalProposal{
 		Type:      pb.ProposalType,
-		DataHash:  CanonicalizeDataHash(proposal.DataHash),
+		DataHash:  CanonicalizeDataHash(&pb.DataHash{Hash: proposal.Data}),
 		Timestamp: proposal.Timestamp,
 		ChainID:   chainID,
 	}

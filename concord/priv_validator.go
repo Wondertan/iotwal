@@ -5,9 +5,10 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/Wondertan/iotwal/concord/pb"
 	"github.com/tendermint/tendermint/crypto"
 	"github.com/tendermint/tendermint/crypto/ed25519"
+
+	"github.com/Wondertan/iotwal/concord/pb"
 )
 
 // PrivProposer defines the functionality of a local Tendermint validator
@@ -88,10 +89,6 @@ func (pv MockPV) SignVote(chainID string, vote *pb.Vote) error {
 // SignProposal implements PrivProposer.
 func (pv MockPV) SignProposal(chainID string, proposal *pb.Proposal) error {
 	useChainID := chainID
-	if pv.breakProposalSigning {
-		useChainID = "incorrect-chain-id"
-	}
-
 	signBytes := ProposalSignBytes(useChainID, proposal)
 	sig, err := pv.PrivKey.Sign(signBytes)
 	if err != nil {

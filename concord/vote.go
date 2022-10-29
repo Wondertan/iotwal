@@ -58,8 +58,8 @@ type Vote struct {
 	Signature        []byte           `json:"signature"`
 }
 
-func NewVote(t pb.SignedMsgType, round int32, dataHash *DataHash) *Vote {
-	return &Vote{Type: t, DataHash: *dataHash, Timestamp: time.Now()}
+func NewVote(t pb.SignedMsgType, round int32, index int32, address []byte, dataHash *DataHash) *Vote {
+	return &Vote{Type: t, DataHash: *dataHash, ValidatorIndex: index, ValidatorAddress: address, Timestamp: time.Now()}
 }
 
 // CommitSig converts the Vote to a CommitSig.
