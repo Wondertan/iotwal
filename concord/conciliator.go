@@ -1,12 +1,13 @@
 package concord
 
 import (
+	"bytes"
 	"context"
+	"errors"
 	"fmt"
-	"reflect"
 	"sync"
 
-	"github.com/celestiaorg/go-libp2p-messenger/serde"
+	"github.com/cosmos/gogoproto/proto"
 	"github.com/libp2p/go-libp2p-core/peer"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/tendermint/tendermint/crypto"
@@ -28,11 +29,15 @@ type conciliator struct {
 	propSelf  PrivProposer
 }
 
+func NewConciliator(p *pubsub.PubSub, self PrivProposer) *conciliator {
+	return &conciliator{pubsub: p, propSelf: self}
+}
+
 // TODO:
-//  * Cache for proposals and votes received from the PS. For rounds that hasn't been started on
-//  local instance yet
-//  	* Garbage collect the the cache every like minute
-//      * Limit cache to receive no more than N messages from a concord peer
+//   - Cache for proposals and votes received from the PS. For rounds that hasn't been started on
+//     local instance yet
+//   - Garbage collect the the cache every like minute
+//   - Limit cache to receive no more than N messages from a concord peer
 type concord struct {
 	id    string
 	topic *pubsub.Topic
@@ -47,9 +52,11 @@ type concord struct {
 
 	// allows only one AgreeOn call
 	agreeLk sync.Mutex
+
+	subs *pubsub.Subscription
 }
 
-func (c *conciliator) newConcord(id string, pv Validator) (*concord, error) {
+func (c *conciliator) NewConcord(id string, pv Validator) (*concord, error) {
 	// TODO: There should be at least one subscription
 	tpc, err := c.pubsub.Join(id)
 	if err != nil {
@@ -69,6 +76,10 @@ func (c *conciliator) newConcord(id string, pv Validator) (*concord, error) {
 		self:      c.propSelf,
 		selfPK:    pk,
 	}
+	cord.subs, err = tpc.Subscribe()
+	if err != nil {
+		return nil, err
+	}
 	return cord, c.pubsub.RegisterTopicValidator(id, cord.incoming)
 }
 
@@ -79,23 +90,28 @@ func (c *conciliator) newConcord(id string, pv Validator) (*concord, error) {
 //   - Enables multiple independent agreements
 //   - Fixes potential catching up issues for layers above
 //   - Handle case where our thread is blocked on validation, but majority already locked on the block.
-//   	- Possible during catching up
-func (c *concord) AgreeOn(ctx context.Context, prop []byte) ([]byte, *Commit, error) {
+//   - Possible during catching up
+func (c *concord) AgreeOn(ctx context.Context, prop []byte, propSet *ProposerSet) ([]byte, *Commit, error) {
+	if propSet == nil {
+		return nil, nil, errors.New("concord: empty proposer set")
+	}
 	c.agreeLk.Lock()
 	defer c.agreeLk.Unlock()
 
-	// get a fresh proposer set
-	// we have to get fresh as they can change after each agreement
-	propSet, err := c.propStore.Get(ctx, c.id)
-	if err != nil {
-		return nil, nil, err
-	}
-
 	c.roundMu.Lock()
-	c.round = newRound(0, c.id, c.topic, &propInfo{propSet, c.self, c.selfPK})
+	index := -1
+	for i, set := range propSet.Proposers {
+		if bytes.Equal(set.PubKey.Bytes(), c.selfPK.Bytes()) {
+			index = i
+		}
+	}
+	if index < 0 {
+		panic("could not find validator index")
+	}
+	c.round = newRound(0, c.id, c.topic, &propInfo{propSet, c.self, int32(index), c.selfPK})
 	c.roundMu.Unlock()
 
-	prop, err = c.round.Propose(ctx, prop)
+	prop, err := c.round.Propose(ctx, prop)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -130,7 +146,7 @@ func (c *concord) incoming(ctx context.Context, _ peer.ID, pmsg *pubsub.Message)
 
 func (c *concord) handle(ctx context.Context, pmsg *pubsub.Message) error {
 	tmsg := &pb.Message{}
-	_, err := serde.Unmarshal(tmsg, pmsg.Data)
+	err := proto.Unmarshal(pmsg.Data, tmsg)
 	if err != nil {
 		return err
 	}
@@ -149,12 +165,40 @@ func (c *concord) handle(ctx context.Context, pmsg *pubsub.Message) error {
 	round := c.round
 	c.roundMu.Unlock()
 
-	switch msg := msg.(type) {
-	case *ProposalMessage:
-		return round.rcvProposal(ctx, msg.Proposal)
-	case *VoteMessage:
-		return round.rcvVote(ctx, msg.Vote)
+	switch tmsg.Sum.(type) {
+	case *pb.Message_Proposal:
+		prop, err := ProposalFromProto(tmsg.GetProposal())
+		if err != nil {
+			return err
+		}
+		return round.rcvProposal(ctx, prop)
+	case *pb.Message_Vote:
+		vote, err := VoteFromProto(tmsg.GetVote())
+		if err != nil {
+			return err
+		}
+		return round.rcvVote(ctx, vote)
 	default:
-		return fmt.Errorf("wrong msg type %v", reflect.TypeOf(msg))
+		return errors.New("concord: invalid message received")
 	}
+}
+
+// encodeMsg encodes a Protobuf message
+func encodeMsg(m proto.Message) ([]byte, error) {
+	msg := &pb.Message{}
+	switch t := m.(type) {
+	case *pb.Proposal:
+		msg.Sum = &pb.Message_Proposal{Proposal: t}
+	case *pb.Vote:
+		msg.Sum = &pb.Message_Vote{Vote: t}
+	default:
+		return nil, fmt.Errorf("unknown message type %T", m)
+	}
+
+	bz, err := proto.Marshal(msg)
+	if err != nil {
+		return nil, fmt.Errorf("unable to marshal %T: %w", msg, err)
+	}
+
+	return bz, nil
 }
