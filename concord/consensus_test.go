@@ -1,4 +1,4 @@
-package testing
+package concord
 
 import (
 	"context"
@@ -10,8 +10,6 @@ import (
 	"github.com/stretchr/testify/require"
 	tmbytes "github.com/tendermint/tendermint/libs/bytes"
 	"golang.org/x/sync/errgroup"
-
-	"github.com/Wondertan/iotwal/concord"
 )
 
 func createP2PNetwork(t *testing.T, amount int) []*pubsub.PubSub {
@@ -40,10 +38,10 @@ func createPubSub(t *testing.T, hosts []host.Host) []*pubsub.PubSub {
 
 func Test_AgreeOn(t *testing.T) {
 	pSubs := createP2PNetwork(t, 5)
-	valSet, privValidators := concord.RandValidatorSet(5, 10)
-	concords := make([]concord.Consensus, 0, len(pSubs))
+	valSet, privValidators := RandValidatorSet(5, 10)
+	concords := make([]Consensus, 0, len(pSubs))
 	for i, pSub := range pSubs {
-		conciliator := concord.NewConciliator(pSub, privValidators[i])
+		conciliator := NewConciliator(pSub, privValidators[i])
 		concord, err := conciliator.NewConcord("iotwal", func(ctx context.Context, data []byte) (tmbytes.HexBytes, error) {
 			return data, nil
 		})
@@ -53,7 +51,7 @@ func Test_AgreeOn(t *testing.T) {
 
 	errgrp, ctx := errgroup.WithContext(context.Background())
 	results := make([][]byte, len(pSubs))
-	commits := make([]*concord.Commit, len(pSubs))
+	commits := make([]*Commit, len(pSubs))
 	for i, c := range concords {
 		c := c
 		i := i
