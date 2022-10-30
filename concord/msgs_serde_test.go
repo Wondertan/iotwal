@@ -7,20 +7,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/tendermint/tendermint/libs/bits"
 	tmrand "github.com/tendermint/tendermint/libs/rand"
 
 	"github.com/Wondertan/iotwal/concord/pb"
 )
 
 func TestMsgToProto(t *testing.T) {
-	bi := DataHash{
-		Hash: tmrand.Bytes(32),
-	}
-	pbBi := bi.ToProto()
-	bits := bits.NewBitArray(1)
-	pbBits := bits.ToProto()
-
 	proposal := Proposal{
 		Type:      pb.ProposalType,
 		Round:     1,
@@ -47,53 +39,6 @@ func TestMsgToProto(t *testing.T) {
 		want     *pb.Message
 		wantErr  bool
 	}{
-		{"successful NewRoundStepMessage", &NewRoundStepMessage{
-			Height:                2,
-			Round:                 1,
-			Step:                  1,
-			SecondsSinceStartTime: 1,
-			LastCommitRound:       2,
-		}, &pb.Message{
-			Sum: &pb.Message_NewRoundStep{
-				NewRoundStep: &pb.NewRoundStep{
-					Height:                2,
-					Round:                 1,
-					Step:                  1,
-					SecondsSinceStartTime: 1,
-					LastCommitRound:       2,
-				},
-			},
-		}, false},
-
-		{"successful NewValidBlockMessage", &NewValidBlockMessage{
-			Height: 1,
-			Round:  1,
-			// BlockPartSetHeader: psh,
-			// BlockParts:         bits,
-			IsCommit: false,
-		}, &pb.Message{
-			Sum: &pb.Message_NewValidBlock{
-				NewValidBlock: &pb.NewValidBlock{
-					Height: 1,
-					Round:  1,
-					// BlockPartSetHeader: pbPsh,
-					// BlockParts:         pbBits,
-					IsCommit: false,
-				},
-			},
-		}, false},
-		{"successful ProposalPOLMessage", &ProposalPOLMessage{
-			Height:           1,
-			ProposalPOLRound: 1,
-			ProposalPOL:      bits,
-		}, &pb.Message{
-			Sum: &pb.Message_ProposalPol{
-				ProposalPol: &pb.ProposalPOL{
-					Height:           1,
-					ProposalPolRound: 1,
-					ProposalPol:      *pbBits,
-				},
-			}}, false},
 		{"successful ProposalMessage", &ProposalMessage{
 			Proposal: &proposal,
 		}, &pb.Message{
@@ -106,38 +51,6 @@ func TestMsgToProto(t *testing.T) {
 		}, &pb.Message{
 			Sum: &pb.Message_Vote{
 				Vote: pbVote,
-			},
-		}, false},
-		{"successful VoteSetMaj23", &VoteSetMaj23Message{
-			Height:   1,
-			Round:    1,
-			Type:     1,
-			DataHash: bi,
-		}, &pb.Message{
-			Sum: &pb.Message_VoteSetMaj23{
-				VoteSetMaj23: &pb.VoteSetMaj23{
-					Height:   1,
-					Round:    1,
-					Type:     1,
-					DataHash: *pbBi,
-				},
-			},
-		}, false},
-		{"successful VoteSetBits", &VoteSetBitsMessage{
-			Height:   1,
-			Round:    1,
-			Type:     1,
-			DataHash: bi,
-			Votes:    bits,
-		}, &pb.Message{
-			Sum: &pb.Message_VoteSetBits{
-				VoteSetBits: &pb.VoteSetBits{
-					Height:   1,
-					Round:    1,
-					Type:     1,
-					DataHash: *pbBi,
-					Votes:    *pbBits,
-				},
 			},
 		}, false},
 		{"failure", nil, &pb.Message{}, true},

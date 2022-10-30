@@ -8,10 +8,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/Wondertan/iotwal/concord/pb"
 	"github.com/tendermint/tendermint/crypto/tmhash"
 	"github.com/tendermint/tendermint/libs/protoio"
 	tmrand "github.com/tendermint/tendermint/libs/rand"
+
+	"github.com/Wondertan/iotwal/concord/pb"
 )
 
 var (
@@ -25,7 +26,7 @@ func init() {
 		panic(err)
 	}
 	testProposal = &Proposal{
-		Data:      DataHash{Hash: []byte("--June_15_2020_amino_was_removed")},
+		Data:      []byte("--June_15_2020_amino_was_removed"),
 		POLRound:  -1,
 		Timestamp: stamp,
 	}
@@ -132,7 +133,7 @@ func TestProposalValidateBasic(t *testing.T) {
 		{"Invalid Round", func(p *Proposal) { p.Round = -1 }, true},
 		{"Invalid POLRound", func(p *Proposal) { p.POLRound = -2 }, true},
 		{"Invalid DataHash", func(p *Proposal) {
-			p.Data = DataHash{[]byte{1, 2, 3}}
+			p.Data = []byte{1, 2, 3}
 		}, true},
 		{"Invalid Signature", func(p *Proposal) {
 			p.Signature = make([]byte, 0)
