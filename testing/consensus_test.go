@@ -53,14 +53,17 @@ func Test_AgreeOn(t *testing.T) {
 
 	errgrp, ctx := errgroup.WithContext(context.Background())
 	results := make([][]byte, len(pSubs))
+	commits := make([]*concord.Commit, len(pSubs))
 	for i, c := range concords {
 		c := c
 		i := i
 		pubKey, err := privValidators[i].GetPubKey()
 		require.NoError(t, err)
 		errgrp.Go(func() error {
-			data, _, err := c.AgreeOn(ctx, valSet, pubKey.Bytes())
+			data, commit, err := c.AgreeOn(ctx, pubKey.Bytes(), valSet)
 			results[i] = data
+
+			commits[i] = commit
 			return err
 		})
 	}
@@ -69,5 +72,10 @@ func Test_AgreeOn(t *testing.T) {
 	require.NoError(t, err)
 	for index := 1; index < len(results); index++ {
 		require.Equal(t, results[0], results[index])
+	}
+
+	for _, commit := range commits {
+		err := valSet.VerifyCommit("iotwal", results[0], commit)
+		require.NoError(t, err)
 	}
 }

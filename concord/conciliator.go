@@ -91,7 +91,7 @@ func (c *conciliator) NewConcord(id string, pv Validator) (*concord, error) {
 //   - Fixes potential catching up issues for layers above
 //   - Handle case where our thread is blocked on validation, but majority already locked on the block.
 //   - Possible during catching up
-func (c *concord) AgreeOn(ctx context.Context, propSet *ProposerSet, prop []byte) ([]byte, *Commit, error) {
+func (c *concord) AgreeOn(ctx context.Context, prop []byte, propSet *ProposerSet) ([]byte, *Commit, error) {
 	if propSet == nil {
 		return nil, nil, errors.New("concord: empty proposer set")
 	}

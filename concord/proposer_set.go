@@ -665,9 +665,9 @@ func (vals *ProposerSet) UpdateWithChangeSet(changes []*Proposer) error {
 // application that depends on the LastCommitInfo sent in BeginBlock, which
 // includes which validators signed. For instance, Gaia incentivizes proposers
 // with a bonus for including more than +2/3 of the signatures.
-func (vals *ProposerSet) VerifyCommit(chainID string, blockID DataHash,
+func (vals *ProposerSet) VerifyCommit(chainID string, data []byte,
 	commit *Commit) error {
-
+	blockID := DataHash{data}
 	if vals.Size() != len(commit.Signatures) {
 		return NewErrInvalidCommitSignatures(vals.Size(), len(commit.Signatures))
 	}

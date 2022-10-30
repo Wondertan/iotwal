@@ -9,5 +9,5 @@ import (
 var log = logging.Logger("conciliator")
 
 type Consensus interface {
-	AgreeOn(context.Context, *ProposerSet, []byte) ([]byte, *Commit, error)
+	AgreeOn(context.Context, []byte, *ProposerSet) ([]byte, *Commit, error)
 }

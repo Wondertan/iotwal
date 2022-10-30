@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/gogo/protobuf/proto"
 	"github.com/tendermint/tendermint/libs/bits"
 
 	"github.com/Wondertan/iotwal/concord/pb"
@@ -16,15 +15,6 @@ import (
 // Message is a message that can be sent and received on the Reactor
 type Message interface {
 	ValidateBasic() error
-}
-
-func decodeMsg(bz []byte) (msg Message, err error) {
-	pb := &pb.Message{}
-	if err = proto.Unmarshal(bz, pb); err != nil {
-		return msg, err
-	}
-
-	return MsgFromProto(pb)
 }
 
 //-------------------------------------
