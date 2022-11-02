@@ -20,7 +20,7 @@ Regret it or not, but the poor decisions on the lower level of the stack affect 
 what tech it is. The stack over Tendermint's legacy blooms and flourishes(Cosmos SDK, IBC, IgniteCLI, Gno), millions are
 invested in the ecosystem to buidl, to build over ABCI(++). 
 
-____TBC__
+___TBC__
 
 ## IOTWAL
 
