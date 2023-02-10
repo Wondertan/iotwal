@@ -2,6 +2,7 @@ package mempool
 
 import (
 	"context"
+	"sync"
 
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/peer"
@@ -17,6 +18,8 @@ const (
 type ValidateFn func(context.Context, []byte) (Tx, error)
 
 type Mempool struct {
+	mtx sync.RWMutex
+
 	pubsub *pubsub.PubSub
 	topic  *pubsub.Topic
 
@@ -117,4 +120,64 @@ func (m *Mempool) processIncoming(
 
 	msg.ValidatorData = tx
 	return pubsub.ValidationAccept
+}
+
+func (m *Mempool) RemoveTxsByKey(hashes ...string) error {
+	for _, hash := range hashes {
+		if !m.txQueue.removeTx(hash) {
+			// TODO: append errors after updating to golang 1.20
+			// and notify what tx we were not able to delete
+		}
+	}
+	return nil
+}
+
+// ReapMaxBytesMaxGas returns a list of transactions within the provided size
+// and gas constraints. Transaction are retrieved in priority order.
+//
+// NOTE:
+// - Transactions returned are not removed from the mempool transaction store or indexes.
+func (m *Mempool) ReapMaxBytesMaxGas(maxBytes, maxGas uint64) []Tx {
+	m.mtx.RLock()
+	defer m.mtx.RUnlock()
+
+	var (
+		totalGas  uint64
+		totalSize uint64
+	)
+
+	// wTxs contains a list of *WrappedTx retrieved from the priority queue that
+	// need to be re-enqueued prior to returning.
+	wTxs := make([]Tx, 0, m.txQueue.numTxs())
+	defer func() {
+		for _, wtx := range wTxs {
+			m.txQueue.insertTx(wtx)
+		}
+	}()
+
+	txs := make([]Tx, 0, m.txQueue.numTxs())
+	for m.txQueue.numTxs() > 0 {
+		tx := m.txQueue.popTx()
+		txs = append(txs, tx)
+		wTxs = append(wTxs, tx)
+		size := tx.Size()
+
+		// Ensure we have capacity for the transaction with respect to the
+		// transaction size.
+		if maxBytes > -1 && totalSize+size > maxBytes {
+			return txs[:len(txs)-1]
+		}
+
+		totalSize += size
+
+		// ensure we have capacity for the transaction with respect to total gas
+		gas := totalGas + tx.Gas()
+		if maxGas > -1 && gas > maxGas {
+			return txs[:len(txs)-1]
+		}
+
+		totalGas = gas
+	}
+
+	return txs
 }
