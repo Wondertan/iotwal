@@ -1,16 +1,15 @@
 package mempool
 
 import (
-	"bytes"
 	"context"
 
 	"github.com/libp2p/go-libp2p-core/host"
-	peer "github.com/libp2p/go-libp2p-peer"
+	"github.com/libp2p/go-libp2p-core/peer"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 )
 
 const (
-	topicID = "iotwal/mempool/v0.0.1"
+	topicID = "/iotwal/mempool/v0.0.1"
 )
 
 // ValidateFn is a client validate func that will request transaction from the network,
@@ -18,15 +17,18 @@ const (
 type ValidateFn func(context.Context, []byte) (Tx, error)
 
 type Mempool struct {
-	pubsub    *pubsub.PubSub
-	topic     *pubsub.Topic
+	pubsub *pubsub.PubSub
+	topic  *pubsub.Topic
+
+	txQueue *TxPriorityQueue
+
 	validator ValidateFn
 
 	ctx    context.Context
 	cancel context.CancelFunc
 }
 
-func NewMempool(h host.Host, validator ValidateFn) (*Mempool, error) {
+func NewMempool(h host.Host, validator ValidateFn, c Comparator) (*Mempool, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	pubsub, err := pubsub.NewGossipSub(ctx, h)
 	if err != nil {
@@ -36,6 +38,7 @@ func NewMempool(h host.Host, validator ValidateFn) (*Mempool, error) {
 	return &Mempool{
 		pubsub:    pubsub,
 		validator: validator,
+		txQueue:   NewTxPriorityQueue(c),
 		ctx:       ctx,
 		cancel:    cancel,
 	}, nil
@@ -87,9 +90,12 @@ func (m *Mempool) subscribe() {
 		if err != nil {
 			return
 		}
-		_, ok := data.ValidatorData.(Tx) // TODO: add valid tx to the pool
+		tx, ok := data.ValidatorData.(Tx) // TODO: add valid tx to the pool
 		if !ok {
 			panic("invalid data received")
+		}
+		if ok := m.txQueue.insertTx(tx); !ok {
+			// add log here
 		}
 	}
 }
@@ -104,8 +110,9 @@ func (m *Mempool) processIncoming(
 		m.pubsub.BlacklistPeer(from)
 		return pubsub.ValidationReject
 	}
-	if !bytes.Equal(tx.Hash(), msg.Data) {
-		panic("invalid transaction received")
+	if !tx.ValidateBasic() {
+		m.pubsub.BlacklistPeer(from)
+		return pubsub.ValidationReject
 	}
 
 	msg.ValidatorData = tx
