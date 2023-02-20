@@ -31,13 +31,12 @@ type Mempool struct {
 	cancel context.CancelFunc
 }
 
-func NewMempool(h host.Host, validator ValidateFn, c Comparator) (*Mempool, error) {
-	ctx, cancel := context.WithCancel(context.Background())
+func NewMempool(ctx context.Context, h host.Host, validator ValidateFn, c Comparator) (*Mempool, error) {
 	pubsub, err := pubsub.NewGossipSub(ctx, h)
 	if err != nil {
-		cancel()
 		return nil, err
 	}
+	ctx, cancel := context.WithCancel(context.Background())
 	return &Mempool{
 		pubsub:    pubsub,
 		validator: validator,
@@ -74,6 +73,7 @@ func (m *Mempool) Stop(context.Context) error {
 		return err
 	}
 	m.cancel()
+	m.ctx = nil
 	return nil
 }
 
