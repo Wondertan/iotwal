@@ -15,14 +15,11 @@ type TxPriorityQueue struct {
 
 	txs     []Tx
 	seenTxs map[string]int64 // represents available txs in mempool with their indexes
-
-	comparator Comparator
 }
 
-func NewTxPriorityQueue(c Comparator) *TxPriorityQueue {
+func newTxPriorityQueue() *TxPriorityQueue {
 	pq := &TxPriorityQueue{
-		txs:        make([]Tx, 0),
-		comparator: c,
+		txs: make([]Tx, 0),
 	}
 
 	heap.Init(pq)
@@ -50,18 +47,18 @@ func (pq *TxPriorityQueue) insertTx(tx Tx) bool {
 	return true
 }
 
-func (pq *TxPriorityQueue) removeTx(hash string) bool {
+func (pq *TxPriorityQueue) removeTx(hashes ...string) {
 	pq.Lock()
 	defer pq.Lock()
-
-	index, ok := pq.seenTxs[hash]
-	if !ok {
-		return false
+	for _, hash := range hashes {
+		index, ok := pq.seenTxs[hash]
+		if !ok || index == -1 {
+			// TODO: add log that tx not exist
+			continue
+		}
+		heap.Remove(pq, int(index))
+		pq.seenTxs[hash] = -1
 	}
-
-	heap.Remove(pq, int(index))
-	pq.seenTxs[hash] = -1
-	return true
 }
 
 // popTx removes the top priority transaction from the queue. It is thread safe.
@@ -71,11 +68,8 @@ func (pq *TxPriorityQueue) popTx() Tx {
 
 	x := heap.Pop(pq)
 	if x != nil {
-		wtx := x.(Tx)
-		pq.seenTxs[string(wtx.Hash())] = -1
-		return wtx
+		return x.(Tx)
 	}
-
 	return nil
 }
 
@@ -111,7 +105,7 @@ func (pq *TxPriorityQueue) Len() int {
 // Less implements the Heap interface. It returns true if the transaction at
 // position i in the queue is of less priority than the transaction at position j.
 func (pq *TxPriorityQueue) Less(i, j int) bool {
-	return pq.comparator(pq.txs[i], pq.txs[j])
+	return pq.txs[i].Fee() < pq.txs[j].Fee()
 }
 
 // Swap implements the Heap interface. It swaps two transactions in the queue.

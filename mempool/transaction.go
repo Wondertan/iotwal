@@ -8,4 +8,5 @@ type Tx interface {
 	Priority() uint64
 	Size() uint64
 	Gas() uint64
+	Fee() uint64
 }
