@@ -27,6 +27,7 @@ func (p *mempool) subscribe() {
 		return
 	}
 	defer subscription.Cancel()
+
 	for {
 		select {
 		case <-p.ctx.Done():

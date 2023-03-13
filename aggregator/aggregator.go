@@ -36,7 +36,9 @@ func NewAggregator(ctx context.Context, h host.Host) (*Aggregator, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	ctx, cancel := context.WithCancel(context.Background())
+
 	return &Aggregator{
 		pubsub:   pubsub,
 		mempools: make(map[string]*mempool),
@@ -47,6 +49,7 @@ func NewAggregator(ctx context.Context, h host.Host) (*Aggregator, error) {
 
 func (a *Aggregator) Join(networkID string, validator ValidateFn) error {
 	topicID := pubsubTopicID(networkID)
+
 	topic, err := a.pubsub.Join(pubsubTopicID(networkID))
 	if err != nil {
 		return err
@@ -128,12 +131,14 @@ func (a *Aggregator) Stop() error {
 
 func (a *Aggregator) RemoveTxs(networkID string, txs []Tx) error {
 	a.mtx.RLock()
+	defer a.mtx.RUnlock()
+
 	pool, ok := a.mempools[networkID]
 	if !ok {
-		a.mtx.RUnlock()
+
 		return errors.New("pool not registered")
 	}
-	a.mtx.RUnlock()
+
 	go pool.remove(txs)
 	return nil
 }
@@ -162,6 +167,7 @@ func (a *Aggregator) ReapMaxBytesMaxGas(ctx context.Context, networkID string, m
 		txsCh <- txs
 		close(txsCh)
 	}()
+
 	return txsCh, nil
 }
 

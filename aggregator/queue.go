@@ -40,9 +40,11 @@ func (pq *TxPriorityQueue) numTxs() int {
 func (pq *TxPriorityQueue) insertTx(tx Tx) bool {
 	pq.Lock()
 	defer pq.Unlock()
+
 	if i, ok := pq.seenTxs[string(tx.Hash())]; ok && i != -1 { // tx already stored in queue
 		return false
 	}
+
 	heap.Push(pq, tx)
 	return true
 }
@@ -50,12 +52,14 @@ func (pq *TxPriorityQueue) insertTx(tx Tx) bool {
 func (pq *TxPriorityQueue) removeTx(hashes ...string) {
 	pq.Lock()
 	defer pq.Lock()
+
 	for _, hash := range hashes {
 		index, ok := pq.seenTxs[hash]
 		if !ok || index == -1 {
 			// TODO: add log that tx not exist
 			continue
 		}
+
 		heap.Remove(pq, int(index))
 		pq.seenTxs[hash] = -1
 	}
@@ -79,7 +83,7 @@ func (pq *TxPriorityQueue) popTx() Tx {
 func (pq *TxPriorityQueue) Push(x any) {
 	tx := x.(Tx)
 	pq.txs = append(pq.txs, tx)
-	pq.seenTxs[string(tx.Hash())] = int64(len(pq.txs))
+	pq.seenTxs[string(tx.Hash())] = int64(len(pq.txs) - 1)
 }
 
 // Pop implements the Heap interface.
