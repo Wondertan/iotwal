@@ -3,45 +3,45 @@ package mempool
 import (
 	"container/heap"
 	"sync"
+
+	"github.com/rs/zerolog/log"
+
+	tx "github.com/Wondertan/iotwal/transaction"
 )
 
 var _ heap.Interface = (*TxPriorityQueue)(nil)
-
-type Comparator func(Tx, Tx) bool
 
 // TxPriorityQueue defines a thread-safe priority queue for valid transactions.
 type TxPriorityQueue struct {
 	sync.RWMutex
 
-	txs     []Tx
+	txs     []tx.Tx
 	seenTxs map[string]int64 // represents available txs in mempool with their indexes
 }
 
 func newTxPriorityQueue() *TxPriorityQueue {
 	pq := &TxPriorityQueue{
-		txs: make([]Tx, 0),
+		txs: make([]tx.Tx, 0),
 	}
 
 	heap.Init(pq)
-
 	return pq
 }
 
-// NumTxs returns the number of transactions in the priority queue. It is
+// numTxs returns the number of transactions in the priority queue. It is
 // thread safe.
 func (pq *TxPriorityQueue) numTxs() int {
 	pq.RLock()
 	defer pq.RUnlock()
-
 	return len(pq.txs)
 }
 
 // PushTx adds a valid transaction to the priority queue. It is thread safe.
-func (pq *TxPriorityQueue) insertTx(tx Tx) bool {
+func (pq *TxPriorityQueue) insertTx(tx tx.Tx) bool {
 	pq.Lock()
 	defer pq.Unlock()
 
-	if i, ok := pq.seenTxs[string(tx.Hash())]; ok && i != -1 { // tx already stored in queue
+	if i, ok := pq.seenTxs[tx.Hash().String()]; ok && i != -1 { // tx already stored in queue
 		return false
 	}
 
@@ -56,7 +56,7 @@ func (pq *TxPriorityQueue) removeTx(hashes ...string) {
 	for _, hash := range hashes {
 		index, ok := pq.seenTxs[hash]
 		if !ok || index == -1 {
-			// TODO: add log that tx not exist
+			log.Warn()
 			continue
 		}
 
@@ -66,13 +66,13 @@ func (pq *TxPriorityQueue) removeTx(hashes ...string) {
 }
 
 // popTx removes the top priority transaction from the queue. It is thread safe.
-func (pq *TxPriorityQueue) popTx() Tx {
+func (pq *TxPriorityQueue) popTx() tx.Tx {
 	pq.Lock()
 	defer pq.Unlock()
 
 	x := heap.Pop(pq)
 	if x != nil {
-		return x.(Tx)
+		return x.(tx.Tx)
 	}
 	return nil
 }
@@ -81,9 +81,9 @@ func (pq *TxPriorityQueue) popTx() Tx {
 //
 // NOTE: A caller should never call Push. Use PushTx instead.
 func (pq *TxPriorityQueue) Push(x any) {
-	tx := x.(Tx)
+	tx := x.(tx.Tx)
 	pq.txs = append(pq.txs, tx)
-	pq.seenTxs[string(tx.Hash())] = int64(len(pq.txs) - 1)
+	pq.seenTxs[tx.Hash().String()] = int64(len(pq.txs) - 1)
 }
 
 // Pop implements the Heap interface.
@@ -92,16 +92,16 @@ func (pq *TxPriorityQueue) Push(x any) {
 func (pq *TxPriorityQueue) Pop() any {
 	old := pq.txs
 	n := len(old)
-	item := old[n-1]
+	tx := old[n-1]
 	old[n-1] = nil // avoid memory leak
 	pq.txs = old[:n-1]
-	pq.seenTxs[string(item.Hash())] = -1
-	return item
+	pq.seenTxs[tx.Hash().String()] = -1
+	return tx
 }
 
 // Len implements the Heap interface.
 //
-// NOTE: A caller should never call Len. Use NumTxs instead.
+// NOTE: A caller should never call Len. Use numTxs instead.
 func (pq *TxPriorityQueue) Len() int {
 	return len(pq.txs)
 }
@@ -116,6 +116,6 @@ func (pq *TxPriorityQueue) Less(i, j int) bool {
 func (pq *TxPriorityQueue) Swap(i, j int) {
 	pq.txs[i], pq.txs[j] = pq.txs[j], pq.txs[i]
 
-	pq.seenTxs[string(pq.txs[i].Hash())] = int64(i)
-	pq.seenTxs[string(pq.txs[j].Hash())] = int64(j)
+	pq.seenTxs[pq.txs[i].Hash().String()] = int64(i)
+	pq.seenTxs[pq.txs[j].Hash().String()] = int64(j)
 }

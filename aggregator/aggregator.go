@@ -10,6 +10,8 @@ import (
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/peer"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
+
+	tx "github.com/Wondertan/iotwal/transaction"
 )
 
 const (
@@ -18,7 +20,7 @@ const (
 
 // ValidateFn is a client validate func that will request transaction from the network,
 // verify its correctness and return a Tx.
-type ValidateFn func(context.Context, []byte) (Tx, error)
+type ValidateFn func(context.Context, []byte) (tx.Tx, error)
 
 type Aggregator struct {
 	mtx sync.RWMutex
@@ -50,7 +52,7 @@ func NewAggregator(ctx context.Context, h host.Host) (*Aggregator, error) {
 func (a *Aggregator) Join(networkID string, validator ValidateFn) error {
 	topicID := pubsubTopicID(networkID)
 
-	topic, err := a.pubsub.Join(pubsubTopicID(networkID))
+	topic, err := a.pubsub.Join(topicID)
 	if err != nil {
 		return err
 	}
@@ -129,7 +131,7 @@ func (a *Aggregator) Stop() error {
 	return multiErr
 }
 
-func (a *Aggregator) RemoveTxs(networkID string, txs []Tx) error {
+func (a *Aggregator) RemoveTxs(networkID string, txs []tx.Tx) error {
 	a.mtx.RLock()
 	defer a.mtx.RUnlock()
 
@@ -148,7 +150,7 @@ func (a *Aggregator) RemoveTxs(networkID string, txs []Tx) error {
 //
 // NOTE:
 // - Transactions returned are not removed from the Aggregator transaction store or indexes.
-func (a *Aggregator) ReapMaxBytesMaxGas(ctx context.Context, networkID string, maxbytes, maxGas uint64) (<-chan []Tx, error) {
+func (a *Aggregator) ReapMaxBytesMaxGas(ctx context.Context, networkID string, maxbytes, maxGas uint64) (<-chan []tx.Tx, error) {
 	a.mtx.RLock()
 	defer a.mtx.RUnlock()
 
@@ -157,7 +159,7 @@ func (a *Aggregator) ReapMaxBytesMaxGas(ctx context.Context, networkID string, m
 		return nil, errors.New("pool not registered")
 	}
 
-	txsCh := make(chan []Tx)
+	txsCh := make(chan []tx.Tx)
 
 	go func() {
 		txs, err := pool.reapMaxBytesMaxGas(ctx, maxbytes, maxGas)
@@ -167,7 +169,6 @@ func (a *Aggregator) ReapMaxBytesMaxGas(ctx context.Context, networkID string, m
 		txsCh <- txs
 		close(txsCh)
 	}()
-
 	return txsCh, nil
 }
 

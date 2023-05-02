@@ -1,9 +1,11 @@
-package mempool
+package tx
+
+import "github.com/ipfs/go-cid"
 
 // Tx represents a read-only interface for the transactions.
 type Tx interface {
 	ValidateBasic() bool
-	Hash() []byte
+	Hash() cid.Cid
 	Sender() []byte
 	Priority() uint64
 	Size() uint64

@@ -29,11 +29,6 @@ func (p *mempool) subscribe() {
 	defer subscription.Cancel()
 
 	for {
-		select {
-		case <-p.ctx.Done():
-			return
-		default:
-		}
 		data, err := subscription.Next(p.ctx)
 		if err != nil {
 			return
@@ -55,7 +50,7 @@ func (p *mempool) remove(txs []Tx) {
 func hashes(txs []Tx) []string {
 	h := make([]string, len(txs))
 	for i, tx := range txs {
-		h[i] = string(tx.Hash())
+		h[i] = tx.Hash().String()
 	}
 	return h
 }

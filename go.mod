@@ -3,9 +3,9 @@ module github.com/Wondertan/iotwal
 go 1.18
 
 require (
-	github.com/celestiaorg/nmt v0.14.0
 	github.com/cosmos/gogoproto v1.4.2
 	github.com/gogo/protobuf v1.3.2
+	github.com/hashicorp/go-multierror v1.1.1
 	github.com/ipfs/go-log/v2 v2.5.1
 	github.com/libp2p/go-libp2p v0.19.0
 	github.com/libp2p/go-libp2p-core v0.15.1
@@ -23,9 +23,10 @@ require (
 	github.com/go-logfmt/logfmt v0.5.1 // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/google/gopacket v1.1.19 // indirect
+	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/golang-lru v0.5.4 // indirect
 	github.com/huin/goupnp v1.0.3 // indirect
-	github.com/ipfs/go-cid v0.1.0 // indirect
+	github.com/ipfs/go-cid v0.4.1 // indirect
 	github.com/ipfs/go-ipfs-util v0.0.2 // indirect
 	github.com/ipfs/go-log v1.0.5 // indirect
 	github.com/jackpal/go-nat-pmp v1.0.2 // indirect
@@ -70,11 +71,11 @@ require (
 	go.uber.org/goleak v1.1.12 // indirect
 	go.uber.org/multierr v1.8.0 // indirect
 	go.uber.org/zap v1.21.0 // indirect
-	golang.org/x/crypto v0.0.0-20220525230936-793ad666bf5e // indirect
+	golang.org/x/crypto v0.1.0 // indirect
 	golang.org/x/mod v0.6.0-dev.0.20220419223038-86c51ed26bb4 // indirect
-	golang.org/x/net v0.0.0-20220726230323-06994584191e // indirect
-	golang.org/x/sys v0.0.0-20220727055044-e65921a090b8 // indirect
-	golang.org/x/text v0.3.7 // indirect
+	golang.org/x/net v0.1.0 // indirect
+	golang.org/x/sys v0.1.0 // indirect
+	golang.org/x/text v0.4.0 // indirect
 	golang.org/x/tools v0.1.12 // indirect
 	google.golang.org/genproto v0.0.0-20220725144611-272f38e5d71b // indirect
 	google.golang.org/grpc v1.49.0 // indirect
