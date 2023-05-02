@@ -6,10 +6,12 @@ require (
 	github.com/cosmos/gogoproto v1.4.2
 	github.com/gogo/protobuf v1.3.2
 	github.com/hashicorp/go-multierror v1.1.1
+	github.com/ipfs/go-cid v0.4.1
 	github.com/ipfs/go-log/v2 v2.5.1
 	github.com/libp2p/go-libp2p v0.19.0
 	github.com/libp2p/go-libp2p-core v0.15.1
 	github.com/libp2p/go-libp2p-pubsub v0.7.1
+	github.com/rs/zerolog v1.27.0
 	github.com/stretchr/testify v1.8.1
 	github.com/tendermint/tendermint v0.34.21-0.20220820140239-d886bc8fddd2
 	golang.org/x/sync v0.0.0-20220722155255-886fb9371eb4
@@ -26,7 +28,6 @@ require (
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/golang-lru v0.5.4 // indirect
 	github.com/huin/goupnp v1.0.3 // indirect
-	github.com/ipfs/go-cid v0.4.1 // indirect
 	github.com/ipfs/go-ipfs-util v0.0.2 // indirect
 	github.com/ipfs/go-log v1.0.5 // indirect
 	github.com/jackpal/go-nat-pmp v1.0.2 // indirect
@@ -44,6 +45,7 @@ require (
 	github.com/libp2p/go-nat v0.1.0 // indirect
 	github.com/libp2p/go-netroute v0.2.0 // indirect
 	github.com/libp2p/go-openssl v0.0.7 // indirect
+	github.com/mattn/go-colorable v0.1.12 // indirect
 	github.com/mattn/go-isatty v0.0.14 // indirect
 	github.com/miekg/dns v1.1.48 // indirect
 	github.com/minio/blake2b-simd v0.0.0-20160723061019-3f5f724cb5b1 // indirect
